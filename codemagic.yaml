@@ -6,11 +6,10 @@ workflows:
     environment:
       java: 17
     scripts:
-      - name: Set up Gradle 8.4 and Build
+      - name: Download Gradle 8.4 and Build
         script: |
-          source "$HOME/.sdkman/bin/sdkman-init.sh"
-          sdk install gradle 8.4 || true
-          sdk use gradle 8.4
-          gradle assembleDebug
+          wget -q https://services.gradle.org/distributions/gradle-8.4-bin.zip
+          unzip -q gradle-8.4-bin.zip
+          ./gradle-8.4/bin/gradle assembleDebug
     artifacts:
       - app/build/outputs/apk/**/*.apk
