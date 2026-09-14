@@ -10,6 +10,6 @@ workflows:
         script: |
           wget -q https://services.gradle.org/distributions/gradle-8.4-bin.zip
           unzip -q gradle-8.4-bin.zip
-          ./gradle-8.4/bin/gradle assembleDebug
+          ./gradle-8.4/bin/gradle assembleDebug --no-daemon -Pkotlin.compiler.execution.strategy="in-process"
     artifacts:
       - app/build/outputs/apk/**/*.apk
