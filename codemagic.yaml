@@ -1,0 +1,14 @@
+workflows:
+  android-build:
+    name: Build Android APK
+    max_build_duration: 30
+    instance_type: mac_mini_m1
+    environment:
+      java: 17
+    scripts:
+      - name: Build Android App
+        script: |
+          chmod +x gradlew
+          ./gradlew assembleDebug
+    artifacts:
+      - app/build/outputs/apk/**/*.apk
