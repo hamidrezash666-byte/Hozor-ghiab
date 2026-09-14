@@ -5,10 +5,11 @@ workflows:
     instance_type: mac_mini_m1
     environment:
       java: 17
-      gradle: 8.4
     scripts:
-      - name: Build Android App
+      - name: Set up Gradle 8.4 and Build
         script: |
+          sdk install gradle 8.4
+          sdk use gradle 8.4
           gradle assembleDebug
     artifacts:
       - app/build/outputs/apk/**/*.apk
