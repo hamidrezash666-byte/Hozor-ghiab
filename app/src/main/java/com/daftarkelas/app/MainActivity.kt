@@ -49,7 +49,7 @@ fun MainAppNav() {
     var selectedSessionId by remember { mutableStateOf<Long?>(null) }
     var editSessionId by remember { mutableStateOf<Long?>(null) }
 
-    // مدیریت دکمه بازگشت سخت‌افزاری
+    // مدیریت دکمه بازگشت سخت‌افزاری گوشی
     BackHandler(enabled = currentScreen != "HOME") {
         when (currentScreen) {
             "STUDENT_PROFILE" -> currentScreen = "STUDENTS"
@@ -249,16 +249,16 @@ fun StudentProfileScreen(studentId: Long, onBack: () -> Unit) {
 
             Text("آمار کلاس حضوری", fontWeight = FontWeight.Bold)
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                StatBadge("غیبت: ${physicalRecords.count { it.status == "غایب" }}", Color.Red)
-                StatBadge("حضور: ${physicalRecords.count { it.status == "حاضر" }}", Color(0xFF43A047))
+                StatBadge("غیبت: ${physicalRecords.count { it.status == "غایب" }}", Color.Red, Color(0xFFB71C1C))
+                StatBadge("حضور: ${physicalRecords.count { it.status == "حاضر" }}", Color(0xFF43A047), Color(0xFF1B5E20))
             }
 
             Spacer(modifier = Modifier.height(12.dp))
             Text("آمار کلاس مجازی", fontWeight = FontWeight.Bold)
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                StatBadge("غیبت: ${virtualRecords.count { it.status == "غایب" }}", Color.Red)
-                StatBadge("تکلیف ناقص: ${virtualRecords.count { it.homeworkStatus == "ناقص" }}", Color(0xFFFBC02D))
-                StatBadge("تکلیف کامل: ${virtualRecords.count { it.homeworkStatus == "کامل" }}", Color(0xFF43A047))
+                StatBadge("غیبت: ${virtualRecords.count { it.status == "غایب" }}", Color.Red, Color(0xFFB71C1C))
+                StatBadge("تکلیف ناقص: ${virtualRecords.count { it.homeworkStatus == "ناقص" }}", Color(0xFFFFB300), Color(0xFF043927))
+                StatBadge("تکلیف کامل: ${virtualRecords.count { it.homeworkStatus == "کامل" }}", Color(0xFF43A047), Color(0xFF1B5E20))
             }
 
             Spacer(modifier = Modifier.height(16.dp))
@@ -279,9 +279,18 @@ fun StudentProfileScreen(studentId: Long, onBack: () -> Unit) {
 }
 
 @Composable
-fun StatBadge(text: String, color: Color) {
-    Surface(color = color.copy(alpha = 0.2f), shape = RoundedCornerShape(8.dp)) {
-        Text(text, color = color, modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp), fontWeight = FontWeight.Bold)
+fun StatBadge(text: String, backgroundColor: Color, textColor: Color = Color(0xFF1C1B1F)) {
+    Surface(
+        color = backgroundColor.copy(alpha = 0.25f),
+        shape = RoundedCornerShape(8.dp)
+    ) {
+        Text(
+            text = text,
+            color = textColor,
+            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+            fontWeight = FontWeight.Bold,
+            fontSize = 13.sp
+        )
     }
 }
 
@@ -433,15 +442,21 @@ fun ReportScreen(sessionId: Long, onBack: () -> Unit) {
                     records.forEach { rec ->
                         val st = students[rec.studentId]
                         Row(modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp), horizontalArrangement = Arrangement.SpaceBetween) {
-                            Text(st?.name ?: "")
+                            Text(st?.name ?: "", fontWeight = FontWeight.Medium)
                             Row {
-                                if (rec.status == "غایب") StatBadge("🔴 غایب", Color.Red)
-                                else StatBadge("🟢 حاضر", Color(0xFF43A047))
+                                if (rec.status == "غایب") {
+                                    StatBadge("🔴 غایب", Color.Red, Color(0xFFB71C1C))
+                                } else {
+                                    StatBadge("🟢 حاضر", Color(0xFF43A047), Color(0xFF1B5E20))
+                                }
 
                                 if (rec.status == "حاضر") {
                                     Spacer(modifier = Modifier.width(4.dp))
-                                    if (rec.homeworkStatus == "ناقص") StatBadge("🟡 تکلیف ناقص", Color(0xFFFBC02D))
-                                    else StatBadge("🟢 تکلیف کامل", Color(0xFF43A047))
+                                    if (rec.homeworkStatus == "ناقص") {
+                                        StatBadge("🟡 تکلیف ناقص", Color(0xFFFFB300), Color(0xFF043927))
+                                    } else {
+                                        StatBadge("🟢 تکلیف کامل", Color(0xFF43A047), Color(0xFF1B5E20))
+                                    }
                                 }
                             }
                         }
