@@ -9,8 +9,8 @@
         android:roundIcon="@drawable/ic_launcher_foreground"
         android:label="دفتر کلاس"
         android:supportsRtl="true"
-        android:theme="@style/Theme.DaftarKelas">
-        
+        android:theme="@android:style/Theme.Material.Light.NoActionBar">
+
         <activity
             android:name=".MainActivity"
             android:exported="true">
