@@ -49,7 +49,7 @@ fun MainAppNav() {
     var selectedSessionId by remember { mutableStateOf<Long?>(null) }
     var editSessionId by remember { mutableStateOf<Long?>(null) }
 
-    // مدیریت دکمه بازگشت/Back سخت‌افزاری گوشی
+    // مدیریت دکمه بازگشت سخت‌افزاری
     BackHandler(enabled = currentScreen != "HOME") {
         when (currentScreen) {
             "STUDENT_PROFILE" -> currentScreen = "STUDENTS"
@@ -74,13 +74,13 @@ fun MainAppNav() {
         "ATTENDANCE" -> AttendanceSessionScreen(
             isVirtual = false,
             existingSessionId = editSessionId,
-            onFinish = { id -> selectedSessionId = id; currentScreen = "REPORT" },
+            onFinish = { _ -> currentScreen = "HOME" }, // برای کلاس حضوری گزارش تصویری حذف شد
             onBack = { currentScreen = "HOME" }
         )
         "VIRTUAL" -> AttendanceSessionScreen(
             isVirtual = true,
             existingSessionId = editSessionId,
-            onFinish = { id -> selectedSessionId = id; currentScreen = "REPORT" },
+            onFinish = { id -> selectedSessionId = id; currentScreen = "REPORT" }, // گزارش تصویری برای کلاس مجازی
             onBack = { currentScreen = "HOME" }
         )
         "REPORT" -> selectedSessionId?.let { id ->
@@ -256,7 +256,7 @@ fun StudentProfileScreen(studentId: Long, onBack: () -> Unit) {
             Spacer(modifier = Modifier.height(12.dp))
             Text("آمار کلاس مجازی", fontWeight = FontWeight.Bold)
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                StatBadge("غیbt: ${virtualRecords.count { it.status == "غایب" }}", Color.Red)
+                StatBadge("غیبت: ${virtualRecords.count { it.status == "غایب" }}", Color.Red)
                 StatBadge("تکلیف ناقص: ${virtualRecords.count { it.homeworkStatus == "ناقص" }}", Color(0xFFFBC02D))
                 StatBadge("تکلیف کامل: ${virtualRecords.count { it.homeworkStatus == "کامل" }}", Color(0xFF43A047))
             }
@@ -332,7 +332,30 @@ fun AttendanceSessionScreen(
                 items(students) { st ->
                     Card(modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
                         Column(modifier = Modifier.padding(12.dp)) {
-                            Text(st.name, fontWeight = FontWeight.Bold)
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(st.name, fontWeight = FontWeight.Bold)
+                                
+                                // دکمه ارسال مستقیم پیامک برای این دانش‌آموز
+                                IconButton(onClick = {
+                                    if (st.parentPhone.isNotBlank()) {
+                                        val stStatus = statusMap[st.id] ?: "حاضر"
+                                        val stHw = hwMap[st.id] ?: "کامل"
+                                        val msg = if (!isVirtual) {
+                                            "ولی گرامی، وضعیت فرزند شما ${st.name} در تاریخ $todayDate: $stStatus."
+                                        } else {
+                                            "ولی گرامی، وضعیت فرزند شما ${st.name} در کلاس مجازی $todayDate: $stStatus ${if (stStatus == "حاضر") "(تکلیف: $stHw)" else ""}."
+                                        }
+                                        repo.sendSmsIntent(context, st.parentPhone, msg)
+                                    }
+                                }) {
+                                    Text("📲", fontSize = 18.sp)
+                                }
+                            }
+                            
                             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                                 Button(
                                     colors = ButtonDefaults.buttonColors(containerColor = if (statusMap[st.id] == "حاضر") Color(0xFF43A047) else Color.Gray),
@@ -344,6 +367,7 @@ fun AttendanceSessionScreen(
                                 ) { Text("غایب") }
                             }
                             if (isVirtual && statusMap[st.id] == "حاضر") {
+                                Spacer(modifier = Modifier.height(4.dp))
                                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                                     Button(
                                         colors = ButtonDefaults.buttonColors(containerColor = if (hwMap[st.id] == "کامل") Color(0xFF43A047) else Color.Gray),
@@ -383,7 +407,7 @@ fun AttendanceSessionScreen(
 
                     onFinish(sessionId)
                 }
-            ) { Text("ذخیره و مشاهده گزارش") }
+            ) { Text("ذخیره جلسه") }
         }
     }
 }
@@ -398,12 +422,12 @@ fun ReportScreen(sessionId: Long, onBack: () -> Unit) {
     val students = dao.getAllStudents().associateBy { it.id }
 
     Scaffold(
-        topBar = { TopAppBar(title = { Text("گزارش تصویری جلسه") }, navigationIcon = { TextButton(onClick = onBack) { Text("پایان") } }) }
+        topBar = { TopAppBar(title = { Text("گزارش تصویری کلاس مجازی") }, navigationIcon = { TextButton(onClick = onBack) { Text("پایان") } }) }
     ) { padding ->
         Column(modifier = Modifier.padding(padding).padding(16.dp)) {
             Card(modifier = Modifier.fillMaxWidth().padding(8.dp)) {
                 Column(modifier = Modifier.padding(16.dp)) {
-                    Text("گزارش کلاس ${if (session.isVirtual) "مجازی" else "حضوری"}", fontWeight = FontWeight.Bold, fontSize = 18.sp)
+                    Text("گزارش کلاس مجازی", fontWeight = FontWeight.Bold, fontSize = 18.sp)
                     Text("تاریخ: ${session.shamsiDate} | ساعت: ${session.time}")
                     Divider(modifier = Modifier.padding(vertical = 8.dp))
                     records.forEach { rec ->
@@ -414,7 +438,7 @@ fun ReportScreen(sessionId: Long, onBack: () -> Unit) {
                                 if (rec.status == "غایب") StatBadge("🔴 غایب", Color.Red)
                                 else StatBadge("🟢 حاضر", Color(0xFF43A047))
 
-                                if (session.isVirtual && rec.status == "حاضر") {
+                                if (rec.status == "حاضر") {
                                     Spacer(modifier = Modifier.width(4.dp))
                                     if (rec.homeworkStatus == "ناقص") StatBadge("🟡 تکلیف ناقص", Color(0xFFFBC02D))
                                     else StatBadge("🟢 تکلیف کامل", Color(0xFF43A047))
