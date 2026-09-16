@@ -10,6 +10,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
@@ -91,6 +92,25 @@ fun HomeScreen(
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
+            // کارت معرفی طراح برنامه
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(12.dp),
+                colors = CardDefaults.cardColors(containerColor = Color(0xFFE3F2FD))
+            ) {
+                Row(
+                    modifier = Modifier.padding(12.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text("👨‍💻", fontSize = 24.sp)
+                    Spacer(modifier = Modifier.width(12.dp))
+                    Column {
+                        Text("طراح و توسعه‌دهنده:", fontSize = 12.sp, color = Color.Gray)
+                        Text("حمیدرضا شریعتی", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = Color(0xFF1565C0))
+                    }
+                }
+            }
+
             MenuCard("🏫 کلاس حضوری", "ثبت حضور و غیاب سریع", Color(0xFF1E88E5), onNavigateToAttendance)
             MenuCard("💻 کلاس مجازی", "ثبت حضور و وضعیت تکالیف", Color(0xFF8E24AA), onNavigateToVirtual)
             MenuCard("👨‍🎓 دانش‌آموزان", "مدیریت پرونده و سوابق", Color(0xFF43A047), onNavigateToStudents)
@@ -104,7 +124,7 @@ fun MenuCard(title: String, subtitle: String, color: Color, onClick: () -> Unit)
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .height(100.dp)
+            .height(90.dp)
             .clickable { onClick() },
         shape = RoundedCornerShape(16.dp),
         colors = CardDefaults.cardColors(containerColor = color.copy(alpha = 0.15f))
@@ -113,9 +133,9 @@ fun MenuCard(title: String, subtitle: String, color: Color, onClick: () -> Unit)
             modifier = Modifier.fillMaxSize().padding(16.dp),
             verticalArrangement = Arrangement.Center
         ) {
-            Text(title, fontSize = 20.sp, fontWeight = FontWeight.Bold, color = color)
+            Text(title, fontSize = 18.sp, fontWeight = FontWeight.Bold, color = color)
             Spacer(modifier = Modifier.height(4.dp))
-            Text(subtitle, fontSize = 14.sp, color = Color.Gray)
+            Text(subtitle, fontSize = 13.sp, color = Color.Gray)
         }
     }
 }
