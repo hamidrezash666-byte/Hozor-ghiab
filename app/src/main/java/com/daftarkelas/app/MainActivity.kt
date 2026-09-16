@@ -74,13 +74,13 @@ fun MainAppNav() {
         "ATTENDANCE" -> AttendanceSessionScreen(
             isVirtual = false,
             existingSessionId = editSessionId,
-            onFinish = { _ -> currentScreen = "HOME" }, // برای کلاس حضوری گزارش تصویری حذف شد
+            onFinish = { _ -> currentScreen = "HOME" }, // عدم نمایش گزارش برای کلاس حضوری
             onBack = { currentScreen = "HOME" }
         )
         "VIRTUAL" -> AttendanceSessionScreen(
             isVirtual = true,
             existingSessionId = editSessionId,
-            onFinish = { id -> selectedSessionId = id; currentScreen = "REPORT" }, // گزارش تصویری برای کلاس مجازی
+            onFinish = { id -> selectedSessionId = id; currentScreen = "REPORT" },
             onBack = { currentScreen = "HOME" }
         )
         "REPORT" -> selectedSessionId?.let { id ->
@@ -348,15 +348,21 @@ fun AttendanceSessionScreen(
                             ) {
                                 Text(st.name, fontWeight = FontWeight.Bold)
                                 
-                                // دکمه ارسال مستقیم پیامک برای این دانش‌آموز
+                                // ارسال دستی پیامک بر اساس متن‌های جدید
                                 IconButton(onClick = {
                                     if (st.parentPhone.isNotBlank()) {
                                         val stStatus = statusMap[st.id] ?: "حاضر"
                                         val stHw = hwMap[st.id] ?: "کامل"
-                                        val msg = if (!isVirtual) {
-                                            "ولی گرامی، وضعیت فرزند شما ${st.name} در تاریخ $todayDate: $stStatus."
-                                        } else {
-                                            "ولی گرامی، وضعیت فرزند شما ${st.name} در کلاس مجازی $todayDate: $stStatus ${if (stStatus == "حاضر") "(تکلیف: $stHw)" else ""}."
+                                        
+                                        val msg = when {
+                                            !isVirtual && stStatus == "غایب" -> 
+                                                "ولی گرامی،\nبه اطلاع می‌رساند دانش‌آموز ${st.name} در تاریخ $todayDate در کلاس حضوری غایب بوده است.\nبا تشکر"
+                                            isVirtual && stStatus == "غایب" -> 
+                                                "ولی گرامی،\nبه اطلاع می‌رساند دانش‌آموز ${st.name} در جلسه آنلاین مورخ $todayDate حضور نداشته است.\nبا تشکر"
+                                            isVirtual && stStatus == "حاضر" && stHw == "ناقص" -> 
+                                                "ولی گرامی،\nبه اطلاع می‌رساند تکالیف درسی دانش‌آموز ${st.name} برای جلسه مورخ $todayDate به‌صورت ناقص ارائه شده است. لطفا جهت پیشرفت تحصیلی ایشان، نظارت لازم را داشته باشید.\nبا تشکر"
+                                            else -> 
+                                                "ولی گرامی،\nوضعیت آموزشی دانش‌آموز ${st.name} در تاریخ $todayDate ثبت گردید.\nبا تشکر"
                                         }
                                         repo.sendSmsIntent(context, st.parentPhone, msg)
                                     }
