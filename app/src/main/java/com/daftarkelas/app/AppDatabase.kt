@@ -26,15 +26,15 @@ data class AttendanceRecord(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
     val sessionId: Long,
     val studentId: Long,
-    val status: String, // "حاضر", "غایب", "تأخیر"
-    val homeworkStatus: String // "کامل", "ناقص", "-"
+    val status: String, // "حاضر"، "غایب"، "تأخیر"
+    val homeworkStatus: String // "کامل"، "ناقص"، "-"
 )
 
 @Entity(tableName = "sms_logs")
 data class SmsLog(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
     val studentId: Long,
-    val reason: String, // "PRESENT_ABSENCE", "VIRTUAL_2_ABSENCE", "VIRTUAL_2_HOMEWORK"
+    val reason: String,
     val lastSessionId: Long,
     val timestamp: Long = System.currentTimeMillis()
 )
@@ -48,8 +48,12 @@ interface ClassDao {
 
     @Insert fun insertSession(session: ClassSession): Long
     @Query("SELECT * FROM class_sessions ORDER BY timestamp DESC") fun getAllSessions(): List<ClassSession>
+    @Query("SELECT * FROM class_sessions WHERE shamsiDate = :shamsiDate AND isVirtual = :isVirtual ORDER BY timestamp DESC LIMIT 1")
+    fun getTodaySession(shamsiDate: String, isVirtual: Boolean): ClassSession?
 
     @Insert fun insertAttendanceRecords(records: List<AttendanceRecord>)
+    @Query("DELETE FROM attendance_records WHERE sessionId = :sessionId")
+    fun deleteRecordsForSession(sessionId: Long)
     @Query("SELECT * FROM attendance_records WHERE sessionId = :sessionId") fun getRecordsForSession(sessionId: Long): List<AttendanceRecord>
     @Query("SELECT * FROM attendance_records WHERE studentId = :studentId") fun getRecordsForStudent(studentId: Long): List<AttendanceRecord>
 
