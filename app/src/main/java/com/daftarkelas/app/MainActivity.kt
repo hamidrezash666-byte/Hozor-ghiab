@@ -2,6 +2,7 @@ package com.daftarkelas.app
 
 import android.os.Bundle
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -47,6 +48,14 @@ fun MainAppNav() {
     var selectedStudentId by remember { mutableStateOf<Long?>(null) }
     var selectedSessionId by remember { mutableStateOf<Long?>(null) }
     var editSessionId by remember { mutableStateOf<Long?>(null) }
+
+    // مدیریت دکمه بازگشت/Back سخت‌افزاری گوشی
+    BackHandler(enabled = currentScreen != "HOME") {
+        when (currentScreen) {
+            "STUDENT_PROFILE" -> currentScreen = "STUDENTS"
+            "STUDENTS", "ATTENDANCE", "VIRTUAL", "REPORT", "HISTORY" -> currentScreen = "HOME"
+        }
+    }
 
     when (currentScreen) {
         "HOME" -> HomeScreen(
@@ -247,7 +256,7 @@ fun StudentProfileScreen(studentId: Long, onBack: () -> Unit) {
             Spacer(modifier = Modifier.height(12.dp))
             Text("آمار کلاس مجازی", fontWeight = FontWeight.Bold)
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                StatBadge("غیبت: ${virtualRecords.count { it.status == "غایب" }}", Color.Red)
+                StatBadge("غیbt: ${virtualRecords.count { it.status == "غایب" }}", Color.Red)
                 StatBadge("تکلیف ناقص: ${virtualRecords.count { it.homeworkStatus == "ناقص" }}", Color(0xFFFBC02D))
                 StatBadge("تکلیف کامل: ${virtualRecords.count { it.homeworkStatus == "کامل" }}", Color(0xFF43A047))
             }
