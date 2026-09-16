@@ -23,28 +23,28 @@ class ClassRepository(context: Context) {
                     smsList.add(Pair(student.parentPhone, msg))
                 }
             } else {
-                // مجازی: منطق ۲ جلسه متوالی
+                // مجازی: منطق ۳ جلسه متوالی
                 val studentRecords = dao.getRecordsForStudent(student.id).sortedBy { it.sessionId }
-                if (studentRecords.size >= 2) {
-                    val lastTwo = studentRecords.takeLast(2)
+                if (studentRecords.size >= 3) {
+                    val lastThree = studentRecords.takeLast(3)
                     
-                    // ۲ غیبت متوالی
-                    if (lastTwo.all { it.status == "غایب" }) {
-                        val lastLog = dao.getLastSmsLog(student.id, "VIRTUAL_2_ABSENCE")
+                    // ۳ غیبت متوالی
+                    if (lastThree.all { it.status == "غایب" }) {
+                        val lastLog = dao.getLastSmsLog(student.id, "VIRTUAL_3_ABSENCE")
                         if (lastLog == null || lastLog.lastSessionId != sessionId - 1) {
-                            val msg = "ولی گرامی، فرزند شما ${student.name} در دو جلسه متوالی کلاس مجازی غیبت داشته است. لطفاً موضوع را پیگیری فرمایید."
+                            val msg = "ولی گرامی، فرزند شما ${student.name} در سه جلسه متوالی کلاس مجازی غیبت داشته است. لطفاً موضوع را پیگیری فرمایید."
                             smsList.add(Pair(student.parentPhone, msg))
-                            dao.insertSmsLog(SmsLog(studentId = student.id, reason = "VIRTUAL_2_ABSENCE", lastSessionId = sessionId))
+                            dao.insertSmsLog(SmsLog(studentId = student.id, reason = "VIRTUAL_3_ABSENCE", lastSessionId = sessionId))
                         }
                     }
 
-                    // ۲ تکلیف ناقص متوالی
-                    if (lastTwo.all { it.homeworkStatus == "ناقص" }) {
-                        val lastLog = dao.getLastSmsLog(student.id, "VIRTUAL_2_HOMEWORK")
+                    // ۳ تکلیف ناقص متوالی
+                    if (lastThree.all { it.homeworkStatus == "ناقص" }) {
+                        val lastLog = dao.getLastSmsLog(student.id, "VIRTUAL_3_HOMEWORK")
                         if (lastLog == null || lastLog.lastSessionId != sessionId - 1) {
-                            val msg = "ولی گرامی، تکالیف فرزند شما ${student.name} در دو جلسه متوالی کلاس مجازی ناقص بوده است. لطفاً موضوع را پیگیری فرمایید."
+                            val msg = "ولی گرامی، تکالیف فرزند شما ${student.name} در سه جلسه متوالی کلاس مجازی ناقص بوده است. لطفاً موضوع را پیگیری فرمایید."
                             smsList.add(Pair(student.parentPhone, msg))
-                            dao.insertSmsLog(SmsLog(studentId = student.id, reason = "VIRTUAL_2_HOMEWORK", lastSessionId = sessionId))
+                            dao.insertSmsLog(SmsLog(studentId = student.id, reason = "VIRTUAL_3_HOMEWORK", lastSessionId = sessionId))
                         }
                     }
                 }
