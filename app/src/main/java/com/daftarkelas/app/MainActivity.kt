@@ -46,11 +46,12 @@ fun MainAppNav() {
     var currentScreen by remember { mutableStateOf("HOME") }
     var selectedStudentId by remember { mutableStateOf<Long?>(null) }
     var selectedSessionId by remember { mutableStateOf<Long?>(null) }
+    var editSessionId by remember { mutableStateOf<Long?>(null) }
 
     when (currentScreen) {
         "HOME" -> HomeScreen(
-            onNavigateToAttendance = { currentScreen = "ATTENDANCE" },
-            onNavigateToVirtual = { currentScreen = "VIRTUAL" },
+            onNavigateToAttendance = { editSessionId = null; currentScreen = "ATTENDANCE" },
+            onNavigateToVirtual = { editSessionId = null; currentScreen = "VIRTUAL" },
             onNavigateToStudents = { currentScreen = "STUDENTS" },
             onNavigateToHistory = { currentScreen = "HISTORY" }
         )
@@ -61,16 +62,28 @@ fun MainAppNav() {
         "STUDENT_PROFILE" -> selectedStudentId?.let { id ->
             StudentProfileScreen(studentId = id, onBack = { currentScreen = "STUDENTS" })
         }
-        "ATTENDANCE" -> AttendanceSessionScreen(isVirtual = false, onFinish = { id ->
-            selectedSessionId = id; currentScreen = "REPORT"
-        }, onBack = { currentScreen = "HOME" })
-        "VIRTUAL" -> AttendanceSessionScreen(isVirtual = true, onFinish = { id ->
-            selectedSessionId = id; currentScreen = "REPORT"
-        }, onBack = { currentScreen = "HOME" })
+        "ATTENDANCE" -> AttendanceSessionScreen(
+            isVirtual = false,
+            existingSessionId = editSessionId,
+            onFinish = { id -> selectedSessionId = id; currentScreen = "REPORT" },
+            onBack = { currentScreen = "HOME" }
+        )
+        "VIRTUAL" -> AttendanceSessionScreen(
+            isVirtual = true,
+            existingSessionId = editSessionId,
+            onFinish = { id -> selectedSessionId = id; currentScreen = "REPORT" },
+            onBack = { currentScreen = "HOME" }
+        )
         "REPORT" -> selectedSessionId?.let { id ->
             ReportScreen(sessionId = id, onBack = { currentScreen = "HOME" })
         }
-        "HISTORY" -> HistoryScreen(onBack = { currentScreen = "HOME" })
+        "HISTORY" -> HistoryScreen(
+            onEditSession = { session ->
+                editSessionId = session.id
+                currentScreen = if (session.isVirtual) "VIRTUAL" else "ATTENDANCE"
+            },
+            onBack = { currentScreen = "HOME" }
+        )
     }
 }
 
@@ -89,32 +102,33 @@ fun HomeScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
-                .padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
+                .padding(16.dp)
         ) {
-            // کارت معرفی طراح برنامه
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(12.dp),
-                colors = CardDefaults.cardColors(containerColor = Color(0xFFE3F2FD))
+            Column(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
-                Row(
-                    modifier = Modifier.padding(12.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text("👨‍💻", fontSize = 24.sp)
-                    Spacer(modifier = Modifier.width(12.dp))
-                    Column {
-                        Text("طراح و توسعه‌دهنده:", fontSize = 12.sp, color = Color.Gray)
-                        Text("حمیدرضا شریعتی", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = Color(0xFF1565C0))
-                    }
-                }
+                MenuCard("🏫 کلاس حضوری", "ثبت یا ویرایش حضور و غیاب امروز", Color(0xFF1E88E5), onNavigateToAttendance)
+                MenuCard("💻 کلاس مجازی", "ثبت یا ویرایش وضعیت تکالیف امروز", Color(0xFF8E24AA), onNavigateToVirtual)
+                MenuCard("👨‍🎓 دانش‌آموزان", "مدیریت پرونده و سوابق", Color(0xFF43A047), onNavigateToStudents)
+                MenuCard("📜 سوابق جلسات", "مشاهده و ویرایش جلسات قبلی", Color(0xFFFB8C00), onNavigateToHistory)
             }
 
-            MenuCard("🏫 کلاس حضوری", "ثبت حضور و غیاب سریع", Color(0xFF1E88E5), onNavigateToAttendance)
-            MenuCard("💻 کلاس مجازی", "ثبت حضور و وضعیت تکالیف", Color(0xFF8E24AA), onNavigateToVirtual)
-            MenuCard("👨‍🎓 دانش‌آموزان", "مدیریت پرونده و سوابق", Color(0xFF43A047), onNavigateToStudents)
-            MenuCard("📜 سوابق جلسات", "مشاهده جلسات ثبت‌شده قبلی", Color(0xFFFB8C00), onNavigateToHistory)
+            // نام طراح پایین صفحه سمت چپ
+            CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(bottom = 8.dp, start = 4.dp)
+                ) {
+                    Text(
+                        text = "Designed by Hamidreza Shariati",
+                        fontSize = 11.sp,
+                        color = Color.Gray,
+                        fontWeight = FontWeight.Medium
+                    )
+                }
+            }
         }
     }
 }
@@ -264,17 +278,45 @@ fun StatBadge(text: String, color: Color) {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun AttendanceSessionScreen(isVirtual: Boolean, onFinish: (Long) -> Unit, onBack: () -> Unit) {
+fun AttendanceSessionScreen(
+    isVirtual: Boolean,
+    existingSessionId: Long? = null,
+    onFinish: (Long) -> Unit,
+    onBack: () -> Unit
+) {
     val context = LocalContext.current
     val dao = remember { AppDatabase.getDatabase(context).classDao() }
     val repo = remember { ClassRepository(context) }
     val students = remember { dao.getAllStudents() }
 
-    val statusMap = remember { mutableStateMapOf<Long, String>().apply { students.forEach { put(it.id, "حاضر") } } }
-    val hwMap = remember { mutableStateMapOf<Long, String>().apply { students.forEach { put(it.id, "کامل") } } }
+    val todayDate = remember { ShamsiCalendar.getCurrentShamsiDate() }
+    val activeSession = remember {
+        if (existingSessionId != null) {
+            dao.getAllSessions().find { it.id == existingSessionId }
+        } else {
+            dao.getTodaySession(todayDate, isVirtual)
+        }
+    }
+
+    val statusMap = remember { mutableStateMapOf<Long, String>() }
+    val hwMap = remember { mutableStateMapOf<Long, String>() }
+
+    LaunchedEffect(activeSession) {
+        val existingRecords = activeSession?.let { dao.getRecordsForSession(it.id) }?.associateBy { it.studentId }
+        students.forEach { st ->
+            val rec = existingRecords?.get(st.id)
+            statusMap[st.id] = rec?.status ?: "حاضر"
+            hwMap[st.id] = rec?.homeworkStatus ?: "کامل"
+        }
+    }
 
     Scaffold(
-        topBar = { TopAppBar(title = { Text(if (isVirtual) "ثبت کلاس مجازی" else "ثبت کلاس حضوری") }, navigationIcon = { TextButton(onClick = onBack) { Text("انصراف") } }) }
+        topBar = {
+            TopAppBar(
+                title = { Text(if (activeSession != null) "ویرایش جلسه (${activeSession.shamsiDate})" else if (isVirtual) "ثبت کلاس مجازی" else "ثبت کلاس حضوری") },
+                navigationIcon = { TextButton(onClick = onBack) { Text("انصراف") } }
+            )
+        }
     ) { padding ->
         Column(modifier = Modifier.padding(padding).padding(16.dp)) {
             LazyColumn(modifier = Modifier.weight(1f)) {
@@ -311,9 +353,11 @@ fun AttendanceSessionScreen(isVirtual: Boolean, onFinish: (Long) -> Unit, onBack
             Button(
                 modifier = Modifier.fillMaxWidth(),
                 onClick = {
-                    val shamsiDate = ShamsiCalendar.getCurrentShamsiDate()
-                    val time = ShamsiCalendar.getCurrentTime()
-                    val sessionId = dao.insertSession(ClassSession(className = "عمومی", isVirtual = isVirtual, shamsiDate = shamsiDate, time = time))
+                    val sessionId = activeSession?.id ?: dao.insertSession(
+                        ClassSession(className = "عمومی", isVirtual = isVirtual, shamsiDate = todayDate, time = ShamsiCalendar.getCurrentTime())
+                    )
+
+                    dao.deleteRecordsForSession(sessionId)
 
                     val records = students.map {
                         AttendanceRecord(
@@ -325,12 +369,12 @@ fun AttendanceSessionScreen(isVirtual: Boolean, onFinish: (Long) -> Unit, onBack
                     }
                     dao.insertAttendanceRecords(records)
 
-                    val alerts = repo.checkAndGetSmsAlerts(sessionId, isVirtual, shamsiDate)
+                    val alerts = repo.checkAndGetSmsAlerts(sessionId, isVirtual, todayDate)
                     alerts.forEach { (phone, msg) -> repo.sendSmsIntent(context, phone, msg) }
 
                     onFinish(sessionId)
                 }
-            ) { Text("ذخیره جلسه و مشاهده گزارش") }
+            ) { Text("ذخیره و مشاهده گزارش") }
         }
     }
 }
@@ -377,7 +421,7 @@ fun ReportScreen(sessionId: Long, onBack: () -> Unit) {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun HistoryScreen(onBack: () -> Unit) {
+fun HistoryScreen(onEditSession: (ClassSession) -> Unit, onBack: () -> Unit) {
     val context = LocalContext.current
     val dao = remember { AppDatabase.getDatabase(context).classDao() }
     val sessions = dao.getAllSessions()
@@ -388,9 +432,20 @@ fun HistoryScreen(onBack: () -> Unit) {
         LazyColumn(modifier = Modifier.padding(padding).padding(16.dp)) {
             items(sessions) { sess ->
                 Card(modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
-                    Column(modifier = Modifier.padding(12.dp)) {
-                        Text("${sess.shamsiDate} - ساعت ${sess.time}", fontWeight = FontWeight.Bold)
-                        Text("نوع: ${if (sess.isVirtual) "کلاس مجازی" else "کلاس حضوری"}", color = Color.Gray)
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(12.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column {
+                            Text("${sess.shamsiDate} - ساعت ${sess.time}", fontWeight = FontWeight.Bold)
+                            Text("نوع: ${if (sess.isVirtual) "کلاس مجازی" else "کلاس حضوری"}", color = Color.Gray)
+                        }
+                        OutlinedButton(onClick = { onEditSession(sess) }) {
+                            Text("ویرایش")
+                        }
                     }
                 }
             }
