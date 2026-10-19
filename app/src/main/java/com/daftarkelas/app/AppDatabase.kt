@@ -3,68 +3,54 @@ package com.daftarkelas.app
 import android.content.Context
 import androidx.room.*
 
-@Entity(tableName = "students")
-data class Student(
+// جدول تعریف برنامه هفتگی کلاس‌ها
+@Entity(tableName = "weekly_schedule")
+data class WeeklySchedule(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
-    val name: String,
+    val dayOfWeek: Int, // 1: شنبه, 2: یکشنبه, ..., 7: جمعه
+    val subjectName: String,
     val className: String,
-    val parentPhone: String
+    val timeSlot: String
 )
 
-@Entity(tableName = "class_sessions")
-data class ClassSession(
+// جدول طرح درس‌های ثبت‌شده برای هر جلسه
+@Entity(tableName = "lesson_plans")
+data class LessonPlan(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
-    val className: String,
-    val isVirtual: Boolean,
-    val shamsiDate: String,
-    val time: String,
-    val timestamp: Long = System.currentTimeMillis()
-)
-
-@Entity(tableName = "attendance_records")
-data class AttendanceRecord(
-    @PrimaryKey(autoGenerate = true) val id: Long = 0,
-    val sessionId: Long,
-    val studentId: Long,
-    val status: String, // "حاضر"، "غایب"، "تأخیر"
-    val homeworkStatus: String // "کامل"، "ناقص"، "-"
-)
-
-@Entity(tableName = "sms_logs")
-data class SmsLog(
-    @PrimaryKey(autoGenerate = true) val id: Long = 0,
-    val studentId: Long,
-    val reason: String,
-    val lastSessionId: Long,
-    val timestamp: Long = System.currentTimeMillis()
+    val scheduleId: Long,
+    val dateStr: String, // تاریخ شمسی (مثلاً 1405/06/25)
+    val topic: String = "",
+    val objective: String = "",
+    val teachingMethod: String = "",
+    val learningActivity: String = "",
+    val noteForNextSession: String = ""
 )
 
 @Dao
-interface ClassDao {
-    @Insert fun insertStudent(student: Student): Long
-    @Update fun updateStudent(student: Student)
-    @Delete fun deleteStudent(student: Student)
-    @Query("SELECT * FROM students ORDER BY name ASC") fun getAllStudents(): List<Student>
+interface LessonPlanDao {
+    // برنامه هفتگی
+    @Insert fun insertSchedule(schedule: WeeklySchedule): Long
+    @Query("SELECT * FROM weekly_schedule ORDER BY dayOfWeek ASC, timeSlot ASC") fun getAllSchedules(): List<WeeklySchedule>
+    @Query("SELECT * FROM weekly_schedule WHERE dayOfWeek = :dayOfWeek") fun getSchedulesForDay(dayOfWeek: Int): List<WeeklySchedule>
+    @Delete fun deleteSchedule(schedule: WeeklySchedule)
 
-    @Insert fun insertSession(session: ClassSession): Long
-    @Query("SELECT * FROM class_sessions ORDER BY timestamp DESC") fun getAllSessions(): List<ClassSession>
-    @Query("SELECT * FROM class_sessions WHERE shamsiDate = :shamsiDate AND isVirtual = :isVirtual ORDER BY timestamp DESC LIMIT 1")
-    fun getTodaySession(shamsiDate: String, isVirtual: Boolean): ClassSession?
+    // طرح درس
+    @Insert(onConflict = OnConflictStrategy.REPLACE) fun insertOrUpdatePlan(plan: LessonPlan): Long
+    @Query("SELECT * FROM lesson_plans WHERE scheduleId = :scheduleId AND dateStr = :dateStr LIMIT 1")
+    fun getPlanForDate(scheduleId: Long, dateStr: String): LessonPlan?
 
-    @Insert fun insertAttendanceRecords(records: List<AttendanceRecord>)
-    @Query("DELETE FROM attendance_records WHERE sessionId = :sessionId")
-    fun deleteRecordsForSession(sessionId: Long)
-    @Query("SELECT * FROM attendance_records WHERE sessionId = :sessionId") fun getRecordsForSession(sessionId: Long): List<AttendanceRecord>
-    @Query("SELECT * FROM attendance_records WHERE studentId = :studentId") fun getRecordsForStudent(studentId: Long): List<AttendanceRecord>
-
-    @Insert fun insertSmsLog(log: SmsLog)
-    @Query("SELECT * FROM sms_logs WHERE studentId = :studentId AND reason = :reason ORDER BY timestamp DESC LIMIT 1")
-    fun getLastSmsLog(studentId: Long, reason: String): SmsLog?
+    // دریافت آخرین یادداشت ثبت‌شده برای جلسه قبلیِ همون درس (جهت نمایش در بالای صفحه)
+    @Query("""
+        SELECT noteForNextSession FROM lesson_plans 
+        WHERE scheduleId = :scheduleId AND dateStr < :currentDate AND noteForNextSession != '' 
+        ORDER BY dateStr DESC LIMIT 1
+    """)
+    fun getPreviousNote(scheduleId: Long, currentDate: String): String?
 }
 
-@Database(entities = [Student::class, ClassSession::class, AttendanceRecord::class, SmsLog::class], version = 1)
+@Database(entities = [WeeklySchedule::class, LessonPlan::class], version = 2, exportSchema = false)
 abstract class AppDatabase : RoomDatabase() {
-    abstract fun classDao(): ClassDao
+    abstract fun lessonPlanDao(): LessonPlanDao
 
     companion object {
         @Volatile private var INSTANCE: AppDatabase? = null
@@ -73,8 +59,11 @@ abstract class AppDatabase : RoomDatabase() {
                 val instance = Room.databaseBuilder(
                     context.applicationContext,
                     AppDatabase::class.java,
-                    "daftar_kelas_db"
-                ).allowMainThreadQueries().build()
+                    "tarh_dars_db"
+                )
+                .fallbackToDestructiveMigration()
+                .allowMainThreadQueries()
+                .build()
                 INSTANCE = instance
                 instance
             }
