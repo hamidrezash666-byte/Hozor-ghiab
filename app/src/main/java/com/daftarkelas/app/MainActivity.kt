@@ -21,7 +21,6 @@ import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
-@OptIn(ExperimentalMaterial3Api::class)
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -29,8 +28,8 @@ class MainActivity : ComponentActivity() {
             CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Rtl) {
                 MaterialTheme(
                     colorScheme = lightColorScheme(
-                        primary = Color(0xFF1E88E5),
-                        secondary = Color(0xFF26A69A),
+                        primary = Color(0xFF043927),
+                        secondary = Color(0xFF2E7D32),
                         surface = Color(0xFFF5F5F5)
                     )
                 ) {
@@ -44,68 +43,68 @@ class MainActivity : ComponentActivity() {
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MainAppNav() {
-    var currentScreen by remember { mutableStateOf("HOME") }
-    var selectedStudentId by remember { mutableStateOf<Long?>(null) }
-    var selectedSessionId by remember { mutableStateOf<Long?>(null) }
-    var editSessionId by remember { mutableStateOf<Long?>(null) }
+    var currentScreen by remember { mutableStateOf("CALENDAR") }
+    var selectedSchedule by remember { mutableStateOf<WeeklySchedule?>(null) }
+    var selectedDate by remember { mutableStateOf(ShamsiCalendar.getCurrentShamsiDate()) }
 
-    // مدیریت دکمه بازگشت سخت‌افزاری گوشی
-    BackHandler(enabled = currentScreen != "HOME") {
+    BackHandler(enabled = currentScreen != "CALENDAR") {
         when (currentScreen) {
-            "STUDENT_PROFILE" -> currentScreen = "STUDENTS"
-            "STUDENTS", "ATTENDANCE", "VIRTUAL", "REPORT", "HISTORY" -> currentScreen = "HOME"
+            "LESSON_EDIT", "SCHEDULE_SETUP" -> currentScreen = "CALENDAR"
         }
     }
 
     when (currentScreen) {
-        "HOME" -> HomeScreen(
-            onNavigateToAttendance = { editSessionId = null; currentScreen = "ATTENDANCE" },
-            onNavigateToVirtual = { editSessionId = null; currentScreen = "VIRTUAL" },
-            onNavigateToStudents = { currentScreen = "STUDENTS" },
-            onNavigateToHistory = { currentScreen = "HISTORY" }
-        )
-        "STUDENTS" -> StudentsScreen(
-            onSelectStudent = { id -> selectedStudentId = id; currentScreen = "STUDENT_PROFILE" },
-            onBack = { currentScreen = "HOME" }
-        )
-        "STUDENT_PROFILE" -> selectedStudentId?.let { id ->
-            StudentProfileScreen(studentId = id, onBack = { currentScreen = "STUDENTS" })
-        }
-        "ATTENDANCE" -> AttendanceSessionScreen(
-            isVirtual = false,
-            existingSessionId = editSessionId,
-            onFinish = { _ -> currentScreen = "HOME" }, // عدم نمایش گزارش برای کلاس حضوری
-            onBack = { currentScreen = "HOME" }
-        )
-        "VIRTUAL" -> AttendanceSessionScreen(
-            isVirtual = true,
-            existingSessionId = editSessionId,
-            onFinish = { id -> selectedSessionId = id; currentScreen = "REPORT" },
-            onBack = { currentScreen = "HOME" }
-        )
-        "REPORT" -> selectedSessionId?.let { id ->
-            ReportScreen(sessionId = id, onBack = { currentScreen = "HOME" })
-        }
-        "HISTORY" -> HistoryScreen(
-            onEditSession = { session ->
-                editSessionId = session.id
-                currentScreen = if (session.isVirtual) "VIRTUAL" else "ATTENDANCE"
+        "CALENDAR" -> CalendarScreen(
+            currentDate = selectedDate,
+            onDateChange = { selectedDate = it },
+            onSelectLesson = { schedule ->
+                selectedSchedule = schedule
+                currentScreen = "LESSON_EDIT"
             },
-            onBack = { currentScreen = "HOME" }
+            onOpenScheduleSetup = { currentScreen = "SCHEDULE_SETUP" }
+        )
+        "LESSON_EDIT" -> selectedSchedule?.let { schedule ->
+            LessonEditScreen(
+                schedule = schedule,
+                dateStr = selectedDate,
+                onBack = { currentScreen = "CALENDAR" }
+            )
+        }
+        "SCHEDULE_SETUP" -> ScheduleSetupScreen(
+            onBack = { currentScreen = "CALENDAR" }
         )
     }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun HomeScreen(
-    onNavigateToAttendance: () -> Unit,
-    onNavigateToVirtual: () -> Unit,
-    onNavigateToStudents: () -> Unit,
-    onNavigateToHistory: () -> Unit
+fun CalendarScreen(
+    currentDate: String,
+    onDateChange: (String) -> Unit,
+    onSelectLesson: (WeeklySchedule) -> Unit,
+    onOpenScheduleSetup: () -> Unit
 ) {
+    val context = LocalContext.current
+    val dao = remember { AppDatabase.getDatabase(context).lessonPlanDao() }
+
+    val dayOfWeek = remember(currentDate) { ShamsiCalendar.getDayOfWeekNumber(currentDate) }
+    val dayName = remember(currentDate) { ShamsiCalendar.getDayOfWeekName(currentDate) }
+    val daySchedules = remember(dayOfWeek) { dao.getSchedulesForDay(dayOfWeek) }
+    
+    // تشخیص روزهای تعطیل (پنج‌شنبه = 6 و جمعه = 7)
+    val isHoliday = dayOfWeek == 6 || dayOfWeek == 7
+
     Scaffold(
-        topBar = { TopAppBar(title = { Text("دفتر کلاس", fontWeight = FontWeight.Bold) }) }
+        topBar = {
+            TopAppBar(
+                title = { Text("طرح درس‌نویسی", fontWeight = FontWeight.Bold) },
+                actions = {
+                    TextButton(onClick = onOpenScheduleSetup) {
+                        Text("تنظیم برنامه هفتگی", color = Color(0xFF043927), fontWeight = FontWeight.Bold)
+                    }
+                }
+            )
+        }
     ) { padding ->
         Column(
             modifier = Modifier
@@ -113,14 +112,110 @@ fun HomeScreen(
                 .padding(padding)
                 .padding(16.dp)
         ) {
-            Column(
-                modifier = Modifier.weight(1f),
-                verticalArrangement = Arrangement.spacedBy(16.dp)
+            // نوار تقویم روزانه با متمایز کردن روزهای تعطیل
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.cardColors(
+                    containerColor = if (isHoliday) Color(0xFFFFEBEE) else Color(0xFFE8F5E9)
+                ),
+                shape = RoundedCornerShape(12.dp)
             ) {
-                MenuCard("🏫 کلاس حضوری", "ثبت یا ویرایش حضور و غیاب امروز", Color(0xFF1E88E5), onNavigateToAttendance)
-                MenuCard("💻 کلاس مجازی", "ثبت یا ویرایش وضعیت تکالیف امروز", Color(0xFF8E24AA), onNavigateToVirtual)
-                MenuCard("👨‍🎓 دانش‌آموزان", "مدیریت پرونده و سوابق", Color(0xFF43A047), onNavigateToStudents)
-                MenuCard("📜 سوابق جلسات", "مشاهده و ویرایش جلسات قبلی", Color(0xFFFB8C00), onNavigateToHistory)
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(12.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    IconButton(onClick = { onDateChange(ShamsiCalendar.getPreviousDate(currentDate)) }) {
+                        Text("▶", fontSize = 18.sp)
+                    }
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Text(dayName, fontSize = 18.sp, fontWeight = FontWeight.Bold, color = if (isHoliday) Color.Red else Color(0xFF043927))
+                            if (isHoliday) {
+                                Surface(
+                                    color = Color.Red.copy(alpha = 0.2f),
+                                    shape = RoundedCornerShape(4.dp)
+                                ) {
+                                    Text("تعطیل", color = Color.Red, fontSize = 11.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp))
+                                }
+                            }
+                        }
+                        Spacer(modifier = Modifier.height(2.dp))
+                        Text(currentDate, fontSize = 14.sp, color = Color.Gray)
+                    }
+                    IconButton(onClick = { onDateChange(ShamsiCalendar.getNextDate(currentDate)) }) {
+                        Text("◀", fontSize = 18.sp)
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            // لیست کلاس‌های روز انتخاب‌شده
+            LazyColumn(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                if (isHoliday) {
+                    item {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(32.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text("امروز روز تعطیل است و کلاسی برنامه‌ریزی نشده.", color = Color.Gray, fontWeight = FontWeight.Medium)
+                        }
+                    }
+                } else if (daySchedules.isEmpty()) {
+                    item {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(32.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text("برای این روز برنامه‌ای ثبت نشده است.", color = Color.Gray)
+                        }
+                    }
+                } else {
+                    items(daySchedules) { schedule ->
+                        val plan = dao.getPlanForDate(schedule.id, currentDate)
+
+                        Card(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable { onSelectLesson(schedule) },
+                            shape = RoundedCornerShape(12.dp),
+                            colors = CardDefaults.cardColors(containerColor = Color.White),
+                            elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+                        ) {
+                            Column(modifier = Modifier.padding(16.dp)) {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween
+                                ) {
+                                    Text(schedule.subjectName, fontWeight = FontWeight.Bold, fontSize = 18.sp, color = Color(0xFF043927))
+                                    Text(schedule.timeSlot, fontSize = 13.sp, color = Color.Gray)
+                                }
+                                Text("کلاس: ${schedule.className}", fontSize = 13.sp, color = Color.DarkGray)
+
+                                Divider(modifier = Modifier.padding(vertical = 8.dp), color = Color.LightGray)
+
+                                // نمایش مستقیم «فعالیت یاددهی-یادگیری» از بیرون
+                                Text("فعالیت یاددهی-یادگیری:", fontSize = 12.sp, color = Color.Gray, fontWeight = FontWeight.Bold)
+                                Text(
+                                    text = if (!plan?.learningActivity.isNull_or_blank()) plan!!.learningActivity else "هنوز فعالیتی ثبت نشده است (جهت ورود بزنید)",
+                                    fontSize = 14.sp,
+                                    fontWeight = FontWeight.Medium,
+                                    color = if (!plan?.learningActivity.isNull_or_blank()) Color.Black else Color.LightGray
+                                )
+                            }
+                        }
+                    }
+                }
             }
 
             // نام طراح پایین صفحه سمت چپ
@@ -128,7 +223,7 @@ fun HomeScreen(
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(bottom = 8.dp, start = 4.dp)
+                        .padding(top = 8.dp, start = 4.dp)
                 ) {
                     Text(
                         text = "Designed by Hamidreza Shariati",
@@ -142,350 +237,165 @@ fun HomeScreen(
     }
 }
 
+private fun String?.isNull_or_blank(): Boolean = this == null || this.isBlank()
+
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun MenuCard(title: String, subtitle: String, color: Color, onClick: () -> Unit) {
-    Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(90.dp)
-            .clickable { onClick() },
-        shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(containerColor = color.copy(alpha = 0.15f))
-    ) {
-        Column(
-            modifier = Modifier.fillMaxSize().padding(16.dp),
-            verticalArrangement = Arrangement.Center
+fun LessonEditScreen(
+    schedule: WeeklySchedule,
+    dateStr: String,
+    onBack: () -> Unit
+) {
+    val context = LocalContext.current
+    val dao = remember { AppDatabase.getDatabase(context).lessonPlanDao() }
+
+    val existingPlan = remember { dao.getPlanForDate(schedule.id, dateStr) }
+    val previousNote = remember { dao.getPreviousNote(schedule.id, dateStr) }
+
+    var topic by remember { mutableStateOf(existingPlan?.topic ?: "") }
+    var objective by remember { mutableStateOf(existingPlan?.objective ?: "") }
+    var teachingMethod by remember { mutableStateOf(existingPlan?.teachingMethod ?: "") }
+    var learningActivity by remember { mutableStateOf(existingPlan?.learningActivity ?: "") }
+    var noteForNextSession by remember { mutableStateOf(existingPlan?.noteForNextSession ?: "") }
+
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = { Text("طرح درس: ${schedule.subjectName}") },
+                navigationIcon = { TextButton(onClick = onBack) { Text("بازگشت") } }
+            )
+        }
+    ) { padding ->
+        LazyColumn(
+            modifier = Modifier
+                .padding(padding)
+                .padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            Text(title, fontSize = 18.sp, fontWeight = FontWeight.Bold, color = color)
-            Spacer(modifier = Modifier.height(4.dp))
-            Text(subtitle, fontSize = 13.sp, color = Color.Gray)
+            // نمایش یادداشت جلسه قبلی در بالاترین بخش
+            if (!previousNote.isNullOrBlank()) {
+                item {
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = CardDefaults.cardColors(containerColor = Color(0xFFFFF8E1)),
+                        shape = RoundedCornerShape(8.dp)
+                    ) {
+                        Column(modifier = Modifier.padding(12.dp)) {
+                            Text("📌 یادداشت منتقل‌شده از جلسه قبل:", fontWeight = FontWeight.Bold, color = Color(0xFFF57F17), fontSize = 13.sp)
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Text(previousNote, fontSize = 14.sp, color = Color(0xFF3E2723))
+                        }
+                    }
+                }
+            }
+
+            item {
+                OutlinedTextField(
+                    value = topic,
+                    onValueChange = { topic = it },
+                    label = { Text("موضوع درس") },
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
+
+            item {
+                OutlinedTextField(
+                    value = objective,
+                    onValueChange = { objective = it },
+                    label = { Text("هدف آموزشی") },
+                    modifier = Modifier.fillMaxWidth(),
+                    minLines = 2
+                )
+            }
+
+            item {
+                OutlinedTextField(
+                    value = teachingMethod,
+                    onValueChange = { teachingMethod = it },
+                    label = { Text("روش تدریس") },
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
+
+            item {
+                OutlinedTextField(
+                    value = learningActivity,
+                    onValueChange = { learningActivity = it },
+                    label = { Text("فعالیت یاددهی-یادگیری") },
+                    modifier = Modifier.fillMaxWidth(),
+                    minLines = 3
+                )
+            }
+
+            item {
+                OutlinedTextField(
+                    value = noteForNextSession,
+                    onValueChange = { noteForNextSession = it },
+                    label = { Text("یادداشت برای جلسه بعدی") },
+                    modifier = Modifier.fillMaxWidth(),
+                    minLines = 2
+                )
+            }
+
+            item {
+                Button(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(50.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF043927)),
+                    onClick = {
+                        val planToSave = LessonPlan(
+                            id = existingPlan?.id ?: 0,
+                            scheduleId = schedule.id,
+                            dateStr = dateStr,
+                            topic = topic,
+                            objective = objective,
+                            teachingMethod = teachingMethod,
+                            learningActivity = learningActivity,
+                            noteForNextSession = noteForNextSession
+                        )
+                        dao.insertOrUpdatePlan(planToSave)
+                        onBack()
+                    }
+                ) {
+                    Text("ذخیره طرح درس", fontSize = 16.sp, fontWeight = FontWeight.Bold)
+                }
+            }
         }
     }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun StudentsScreen(onSelectStudent: (Long) -> Unit, onBack: () -> Unit) {
+fun ScheduleSetupScreen(onBack: () -> Unit) {
     val context = LocalContext.current
-    val dao = remember { AppDatabase.getDatabase(context).classDao() }
-    var students by remember { mutableStateOf(dao.getAllStudents()) }
+    val dao = remember { AppDatabase.getDatabase(context).lessonPlanDao() }
+    var schedules by remember { mutableStateOf(dao.getAllSchedules()) }
     var showAddDialog by remember { mutableStateOf(false) }
 
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("لیست دانش‌آموزان") },
+                title = { Text("تنظیم برنامه هفتگی") },
                 navigationIcon = { TextButton(onClick = onBack) { Text("بازگشت") } }
             )
         },
         floatingActionButton = {
-            FloatingActionButton(onClick = { showAddDialog = true }) { Text("+") }
+            FloatingActionButton(
+                onClick = { showAddDialog = true },
+                containerColor = Color(0xFF043927),
+                contentColor = Color.White
+            ) { Text("+", fontSize = 24.sp) }
         }
     ) { padding ->
-        LazyColumn(modifier = Modifier.padding(padding).padding(16.dp)) {
-            items(students) { student ->
-                Card(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(vertical = 6.dp)
-                        .clickable { onSelectStudent(student.id) }
-                ) {
-                    Column(modifier = Modifier.padding(16.dp)) {
-                        Text(student.name, fontWeight = FontWeight.Bold, fontSize = 18.sp)
-                        Text("کلاس: ${student.className} | شماره ولی: ${student.parentPhone}", color = Color.Gray)
-                    }
-                }
-            }
-        }
-    }
-
-    if (showAddDialog) {
-        var name by remember { mutableStateOf("") }
-        var className by remember { mutableStateOf("") }
-        var phone by remember { mutableStateOf("") }
-
-        AlertDialog(
-            onDismissRequest = { showAddDialog = false },
-            title = { Text("افزودن دانش‌آموز") },
-            text = {
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    OutlinedTextField(value = name, onValueChange = { name = it }, label = { Text("نام و نام خانوادگی") })
-                    OutlinedTextField(value = className, onValueChange = { className = it }, label = { Text("نام کلاس") })
-                    OutlinedTextField(value = phone, onValueChange = { phone = it }, label = { Text("شماره ولی") })
-                }
-            },
-            confirmButton = {
-                Button(onClick = {
-                    if (name.isNotBlank()) {
-                        dao.insertStudent(Student(name = name, className = className, parentPhone = phone))
-                        students = dao.getAllStudents()
-                        showAddDialog = false
-                    }
-                }) { Text("ثبت") }
-            }
-        )
-    }
-}
-
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-fun StudentProfileScreen(studentId: Long, onBack: () -> Unit) {
-    val context = LocalContext.current
-    val dao = remember { AppDatabase.getDatabase(context).classDao() }
-    val student = dao.getAllStudents().find { it.id == studentId } ?: return
-    val records = dao.getRecordsForStudent(studentId)
-    val sessions = dao.getAllSessions().associateBy { it.id }
-
-    val physicalRecords = records.filter { sessions[it.sessionId]?.isVirtual == false }
-    val virtualRecords = records.filter { sessions[it.sessionId]?.isVirtual == true }
-
-    Scaffold(
-        topBar = { TopAppBar(title = { Text("پرونده دانش‌آموز") }, navigationIcon = { TextButton(onClick = onBack) { Text("بازگشت") } }) }
-    ) { padding ->
-        Column(modifier = Modifier.padding(padding).padding(16.dp)) {
-            Text(student.name, fontSize = 22.sp, fontWeight = FontWeight.Bold)
-            Text("کلاس: ${student.className}", color = Color.Gray)
-            Spacer(modifier = Modifier.height(16.dp))
-
-            Text("آمار کلاس حضوری", fontWeight = FontWeight.Bold)
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                StatBadge("غیبت: ${physicalRecords.count { it.status == "غایب" }}", Color.Red, Color(0xFFB71C1C))
-                StatBadge("حضور: ${physicalRecords.count { it.status == "حاضر" }}", Color(0xFF43A047), Color(0xFF1B5E20))
-            }
-
-            Spacer(modifier = Modifier.height(12.dp))
-            Text("آمار کلاس مجازی", fontWeight = FontWeight.Bold)
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                StatBadge("غیبت: ${virtualRecords.count { it.status == "غایب" }}", Color.Red, Color(0xFFB71C1C))
-                StatBadge("تکلیف ناقص: ${virtualRecords.count { it.homeworkStatus == "ناقص" }}", Color(0xFFFFB300), Color(0xFF043927))
-                StatBadge("تکلیف کامل: ${virtualRecords.count { it.homeworkStatus == "کامل" }}", Color(0xFF43A047), Color(0xFF1B5E20))
-            }
-
-            Spacer(modifier = Modifier.height(16.dp))
-            Text("سوابق جلسات", fontWeight = FontWeight.Bold)
-            LazyColumn {
-                items(records.reversed()) { rec ->
-                    val sess = sessions[rec.sessionId]
-                    Card(modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
-                        Row(modifier = Modifier.padding(12.dp), horizontalArrangement = Arrangement.SpaceBetween) {
-                            Text("${sess?.shamsiDate ?: ""} - ${if (sess?.isVirtual == true) "مجازی" else "حضوری"}")
-                            Text("وضعیت: ${rec.status} ${if (rec.homeworkStatus != "-") "| تکلیف: ${rec.homeworkStatus}" else ""}")
-                        }
-                    }
-                }
-            }
-        }
-    }
-}
-
-@Composable
-fun StatBadge(text: String, backgroundColor: Color, textColor: Color = Color(0xFF1C1B1F)) {
-    Surface(
-        color = backgroundColor.copy(alpha = 0.25f),
-        shape = RoundedCornerShape(8.dp)
-    ) {
-        Text(
-            text = text,
-            color = textColor,
-            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
-            fontWeight = FontWeight.Bold,
-            fontSize = 13.sp
-        )
-    }
-}
-
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-fun AttendanceSessionScreen(
-    isVirtual: Boolean,
-    existingSessionId: Long? = null,
-    onFinish: (Long) -> Unit,
-    onBack: () -> Unit
-) {
-    val context = LocalContext.current
-    val dao = remember { AppDatabase.getDatabase(context).classDao() }
-    val repo = remember { ClassRepository(context) }
-    val students = remember { dao.getAllStudents() }
-
-    val todayDate = remember { ShamsiCalendar.getCurrentShamsiDate() }
-    val activeSession = remember {
-        if (existingSessionId != null) {
-            dao.getAllSessions().find { it.id == existingSessionId }
-        } else {
-            dao.getTodaySession(todayDate, isVirtual)
-        }
-    }
-
-    val statusMap = remember { mutableStateMapOf<Long, String>() }
-    val hwMap = remember { mutableStateMapOf<Long, String>() }
-
-    LaunchedEffect(activeSession) {
-        val existingRecords = activeSession?.let { dao.getRecordsForSession(it.id) }?.associateBy { it.studentId }
-        students.forEach { st ->
-            val rec = existingRecords?.get(st.id)
-            statusMap[st.id] = rec?.status ?: "حاضر"
-            hwMap[st.id] = rec?.homeworkStatus ?: "کامل"
-        }
-    }
-
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text(if (activeSession != null) "ویرایش جلسه (${activeSession.shamsiDate})" else if (isVirtual) "ثبت کلاس مجازی" else "ثبت کلاس حضوری") },
-                navigationIcon = { TextButton(onClick = onBack) { Text("انصراف") } }
-            )
-        }
-    ) { padding ->
-        Column(modifier = Modifier.padding(padding).padding(16.dp)) {
-            LazyColumn(modifier = Modifier.weight(1f)) {
-                items(students) { st ->
-                    Card(modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
-                        Column(modifier = Modifier.padding(12.dp)) {
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Text(st.name, fontWeight = FontWeight.Bold)
-                                
-                                // ارسال دستی پیامک بر اساس متن‌های جدید
-                                IconButton(onClick = {
-                                    if (st.parentPhone.isNotBlank()) {
-                                        val stStatus = statusMap[st.id] ?: "حاضر"
-                                        val stHw = hwMap[st.id] ?: "کامل"
-                                        
-                                        val msg = when {
-                                            !isVirtual && stStatus == "غایب" -> 
-                                                "ولی گرامی،\nبه اطلاع می‌رساند دانش‌آموز ${st.name} در تاریخ $todayDate در کلاس حضوری غایب بوده است.\nبا تشکر"
-                                            isVirtual && stStatus == "غایب" -> 
-                                                "ولی گرامی،\nبه اطلاع می‌رساند دانش‌آموز ${st.name} در جلسه آنلاین مورخ $todayDate حضور نداشته است.\nبا تشکر"
-                                            isVirtual && stStatus == "حاضر" && stHw == "ناقص" -> 
-                                                "ولی گرامی،\nبه اطلاع می‌رساند تکالیف درسی دانش‌آموز ${st.name} برای جلسه مورخ $todayDate به‌صورت ناقص ارائه شده است. لطفا جهت پیشرفت تحصیلی ایشان، نظارت لازم را داشته باشید.\nبا تشکر"
-                                            else -> 
-                                                "ولی گرامی،\nوضعیت آموزشی دانش‌آموز ${st.name} در تاریخ $todayDate ثبت گردید.\nبا تشکر"
-                                        }
-                                        repo.sendSmsIntent(context, st.parentPhone, msg)
-                                    }
-                                }) {
-                                    Text("📲", fontSize = 18.sp)
-                                }
-                            }
-                            
-                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                Button(
-                                    colors = ButtonDefaults.buttonColors(containerColor = if (statusMap[st.id] == "حاضر") Color(0xFF43A047) else Color.Gray),
-                                    onClick = { statusMap[st.id] = "حاضر" }
-                                ) { Text("حاضر") }
-                                Button(
-                                    colors = ButtonDefaults.buttonColors(containerColor = if (statusMap[st.id] == "غایب") Color.Red else Color.Gray),
-                                    onClick = { statusMap[st.id] = "غایب" }
-                                ) { Text("غایب") }
-                            }
-                            if (isVirtual && statusMap[st.id] == "حاضر") {
-                                Spacer(modifier = Modifier.height(4.dp))
-                                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                    Button(
-                                        colors = ButtonDefaults.buttonColors(containerColor = if (hwMap[st.id] == "کامل") Color(0xFF43A047) else Color.Gray),
-                                        onClick = { hwMap[st.id] = "کامل" }
-                                    ) { Text("تکلیف کامل") }
-                                    Button(
-                                        colors = ButtonDefaults.buttonColors(containerColor = if (hwMap[st.id] == "ناقص") Color(0xFFFBC02D) else Color.Gray),
-                                        onClick = { hwMap[st.id] = "ناقص" }
-                                    ) { Text("تکلیف ناقص") }
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-            Button(
-                modifier = Modifier.fillMaxWidth(),
-                onClick = {
-                    val sessionId = activeSession?.id ?: dao.insertSession(
-                        ClassSession(className = "عمومی", isVirtual = isVirtual, shamsiDate = todayDate, time = ShamsiCalendar.getCurrentTime())
-                    )
-
-                    dao.deleteRecordsForSession(sessionId)
-
-                    val records = students.map {
-                        AttendanceRecord(
-                            sessionId = sessionId,
-                            studentId = it.id,
-                            status = statusMap[it.id] ?: "حاضر",
-                            homeworkStatus = if (isVirtual && statusMap[it.id] == "حاضر") hwMap[it.id] ?: "کامل" else "-"
-                        )
-                    }
-                    dao.insertAttendanceRecords(records)
-
-                    val alerts = repo.checkAndGetSmsAlerts(sessionId, isVirtual, todayDate)
-                    alerts.forEach { (phone, msg) -> repo.sendSmsIntent(context, phone, msg) }
-
-                    onFinish(sessionId)
-                }
-            ) { Text("ذخیره جلسه") }
-        }
-    }
-}
-
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-fun ReportScreen(sessionId: Long, onBack: () -> Unit) {
-    val context = LocalContext.current
-    val dao = remember { AppDatabase.getDatabase(context).classDao() }
-    val session = dao.getAllSessions().find { it.id == sessionId } ?: return
-    val records = dao.getRecordsForSession(sessionId)
-    val students = dao.getAllStudents().associateBy { it.id }
-
-    Scaffold(
-        topBar = { TopAppBar(title = { Text("گزارش تصویری کلاس مجازی") }, navigationIcon = { TextButton(onClick = onBack) { Text("پایان") } }) }
-    ) { padding ->
-        Column(modifier = Modifier.padding(padding).padding(16.dp)) {
-            Card(modifier = Modifier.fillMaxWidth().padding(8.dp)) {
-                Column(modifier = Modifier.padding(16.dp)) {
-                    Text("گزارش کلاس مجازی", fontWeight = FontWeight.Bold, fontSize = 18.sp)
-                    Text("تاریخ: ${session.shamsiDate} | ساعت: ${session.time}")
-                    Divider(modifier = Modifier.padding(vertical = 8.dp))
-                    records.forEach { rec ->
-                        val st = students[rec.studentId]
-                        Row(modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp), horizontalArrangement = Arrangement.SpaceBetween) {
-                            Text(st?.name ?: "", fontWeight = FontWeight.Medium)
-                            Row {
-                                if (rec.status == "غایب") {
-                                    StatBadge("🔴 غایب", Color.Red, Color(0xFFB71C1C))
-                                } else {
-                                    StatBadge("🟢 حاضر", Color(0xFF43A047), Color(0xFF1B5E20))
-                                }
-
-                                if (rec.status == "حاضر") {
-                                    Spacer(modifier = Modifier.width(4.dp))
-                                    if (rec.homeworkStatus == "ناقص") {
-                                        StatBadge("🟡 تکلیف ناقص", Color(0xFFFFB300), Color(0xFF043927))
-                                    } else {
-                                        StatBadge("🟢 تکلیف کامل", Color(0xFF43A047), Color(0xFF1B5E20))
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
-}
-
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-fun HistoryScreen(onEditSession: (ClassSession) -> Unit, onBack: () -> Unit) {
-    val context = LocalContext.current
-    val dao = remember { AppDatabase.getDatabase(context).classDao() }
-    val sessions = dao.getAllSessions()
-
-    Scaffold(
-        topBar = { TopAppBar(title = { Text("سوابق جلسات") }, navigationIcon = { TextButton(onClick = onBack) { Text("بازگشت") } }) }
-    ) { padding ->
-        LazyColumn(modifier = Modifier.padding(padding).padding(16.dp)) {
-            items(sessions) { sess ->
-                Card(modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
+        LazyColumn(
+            modifier = Modifier
+                .padding(padding)
+                .padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            items(schedules) { sch ->
+                Card(modifier = Modifier.fillMaxWidth()) {
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -494,15 +404,63 @@ fun HistoryScreen(onEditSession: (ClassSession) -> Unit, onBack: () -> Unit) {
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Column {
-                            Text("${sess.shamsiDate} - ساعت ${sess.time}", fontWeight = FontWeight.Bold)
-                            Text("نوع: ${if (sess.isVirtual) "کلاس مجازی" else "کلاس حضوری"}", color = Color.Gray)
+                            Text("${ShamsiCalendar.getDayNameByNumber(sch.dayOfWeek)} - ${sch.subjectName}", fontWeight = FontWeight.Bold)
+                            Text("کلاس: ${sch.className} | زمان: ${sch.timeSlot}", fontSize = 12.sp, color = Color.Gray)
                         }
-                        OutlinedButton(onClick = { onEditSession(sess) }) {
-                            Text("ویرایش")
+                        IconButton(onClick = {
+                            dao.deleteSchedule(sch)
+                            schedules = dao.getAllSchedules()
+                        }) {
+                            Text("🗑️")
                         }
                     }
                 }
             }
         }
+    }
+
+    if (showAddDialog) {
+        var selectedDay by remember { mutableStateOf(1) }
+        var subjectName by remember { mutableStateOf("") }
+        var className by remember { mutableStateOf("") }
+        var timeSlot by remember { mutableStateOf("") }
+
+        AlertDialog(
+            onDismissRequest = { showAddDialog = false },
+            title = { Text("افزودن درس به برنامه") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text("روز هفته:")
+                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                        (1..7).forEach { day ->
+                            FilterChip(
+                                selected = selectedDay == day,
+                                onClick = { selectedDay = day },
+                                label = { Text(ShamsiCalendar.getDayShortName(day), fontSize = 11.sp) }
+                            )
+                        }
+                    }
+                    OutlinedTextField(value = subjectName, onValueChange = { subjectName = it }, label = { Text("نام درس / موضوع") })
+                    OutlinedTextField(value = className, onValueChange = { className = it }, label = { Text("نام کلاس") })
+                    OutlinedTextField(value = timeSlot, onValueChange = { timeSlot = it }, label = { Text("ساعت کلاس (مثلاً 08:00 - 09:30)") })
+                }
+            },
+            confirmButton = {
+                Button(onClick = {
+                    if (subjectName.isNotBlank()) {
+                        dao.insertSchedule(
+                            WeeklySchedule(
+                                dayOfWeek = selectedDay,
+                                subjectName = subjectName,
+                                className = className,
+                                timeSlot = timeSlot
+                            )
+                        )
+                        schedules = dao.getAllSchedules()
+                        showAddDialog = false
+                    }
+                }) { Text("ثبت") }
+            }
+        )
     }
 }
