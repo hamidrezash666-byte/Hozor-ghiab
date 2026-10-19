@@ -91,10 +91,8 @@ fun CalendarScreen(
     val dayName = remember(currentDate) { ShamsiCalendar.getDayOfWeekName(currentDate) }
     val daySchedules = remember(dayOfWeek) { dao.getSchedulesForDay(dayOfWeek) }
     
-    // تشخیص روزهای تعطیل (پنج‌شنبه = 6 و جمعه = 7)
+    // پنج‌شنبه (6) و جمعه (7) تعطیل
     val isHoliday = dayOfWeek == 6 || dayOfWeek == 7
-
-    // مدیریت منوی سه‌نقطه بالا
     var menuExpanded by remember { mutableStateOf(false) }
 
     Scaffold(
@@ -129,7 +127,7 @@ fun CalendarScreen(
                 .padding(padding)
                 .padding(16.dp)
         ) {
-            // نوار تقویم روزانه با قابلیت ورق زدن
+            // نوار تقویم روزانه
             Card(
                 modifier = Modifier.fillMaxWidth(),
                 colors = CardDefaults.cardColors(
@@ -170,7 +168,7 @@ fun CalendarScreen(
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            // لیست کلاس‌های روز انتخاب‌شده
+            // لیست درس‌های روز
             LazyColumn(
                 modifier = Modifier.weight(1f),
                 verticalArrangement = Arrangement.spacedBy(12.dp)
@@ -217,11 +215,12 @@ fun CalendarScreen(
                                     Text(schedule.subjectName, fontWeight = FontWeight.Bold, fontSize = 18.sp, color = Color(0xFF043927))
                                     Text(schedule.timeSlot, fontSize = 13.sp, color = Color.Gray)
                                 }
-                                Text("کلاس: ${schedule.className}", fontSize = 13.sp, color = Color.DarkGray)
+                                if (schedule.className.isNotBlank()) {
+                                    Text("کلاس: ${schedule.className}", fontSize = 13.sp, color = Color.DarkGray)
+                                }
 
                                 Divider(modifier = Modifier.padding(vertical = 8.dp), color = Color.LightGray)
 
-                                // نمایش فعالیت یاددهی-یادگیری مستقیماً از بیرون روی کارت
                                 Text("فعالیت یاددهی-یادگیری:", fontSize = 12.sp, color = Color.Gray, fontWeight = FontWeight.Bold)
                                 Text(
                                     text = if (!plan?.learningActivity.isNull_or_blank()) plan!!.learningActivity else "هنوز فعالیتی ثبت نشده است (جهت ورود بزنید)",
@@ -235,7 +234,7 @@ fun CalendarScreen(
                 }
             }
 
-            // نام طراح پایین صفحه سمت چپ
+            // نام طراح
             CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr) {
                 Box(
                     modifier = Modifier
@@ -267,6 +266,7 @@ fun LessonEditScreen(
     val dao = remember { AppDatabase.getDatabase(context).lessonPlanDao() }
 
     val existingPlan = remember { dao.getPlanForDate(schedule.id, dateStr) }
+    // فراخوانی یادداشت منتقل شده از جلسه قبل برای همین درس
     val previousNote = remember { dao.getPreviousNote(schedule.id, dateStr) }
 
     var topic by remember { mutableStateOf(existingPlan?.topic ?: "") }
@@ -289,7 +289,7 @@ fun LessonEditScreen(
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            // نمایش یادداشت جلسه قبلی در بالاترین بخش
+            // یادآور هوشمند: نمایش یادداشت ثبت شده در جلسه قبلیِ همین درس در بالای فرم
             if (!previousNote.isNullOrBlank()) {
                 item {
                     Card(
@@ -298,9 +298,9 @@ fun LessonEditScreen(
                         shape = RoundedCornerShape(8.dp)
                     ) {
                         Column(modifier = Modifier.padding(12.dp)) {
-                            Text("📌 یادداشت منتقل‌شده از جلسه قبل:", fontWeight = FontWeight.Bold, color = Color(0xFFF57F17), fontSize = 13.sp)
+                            Text("📌 یادداشت منتقل‌شده از جلسه قبل (${schedule.subjectName}):", fontWeight = FontWeight.Bold, color = Color(0xFFF57F17), fontSize = 13.sp)
                             Spacer(modifier = Modifier.height(4.dp))
-                            Text(previousNote, fontSize = 14.sp, color = Color(0xFF3E2723))
+                            Text(previousNote, fontSize = 14.sp, color = Color(0xFF3E2723), fontWeight = FontWeight.Medium)
                         }
                     }
                 }
@@ -348,7 +348,7 @@ fun LessonEditScreen(
                 OutlinedTextField(
                     value = noteForNextSession,
                     onValueChange = { noteForNextSession = it },
-                    label = { Text("یادداشت برای جلسه بعدی") },
+                    label = { Text("یادداشت برای جلسه بعدی (در جلسه بعد یادآوری می‌شود)") },
                     modifier = Modifier.fillMaxWidth(),
                     minLines = 2
                 )
@@ -390,6 +390,12 @@ fun ScheduleSetupScreen(onBack: () -> Unit) {
     var schedules by remember { mutableStateOf(dao.getAllSchedules()) }
     var showAddDialog by remember { mutableStateOf(false) }
 
+    // لیست دروس آماده
+    val predefinedSubjects = listOf(
+        "قرآن", "ورزش", "هنر", "تفکر و پژوهش", "کاروفناوری",
+        "هدیه‌ها", "علوم", "مطالعات اجتماعی", "فارسی", "ریاضی"
+    )
+
     Scaffold(
         topBar = {
             TopAppBar(
@@ -421,8 +427,8 @@ fun ScheduleSetupScreen(onBack: () -> Unit) {
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Column {
-                            Text("${ShamsiCalendar.getDayNameByNumber(sch.dayOfWeek)} - ${sch.subjectName}", fontWeight = FontWeight.Bold)
-                            Text("کلاس: ${sch.className} | زمان: ${sch.timeSlot}", fontSize = 12.sp, color = Color.Gray)
+                            Text("${ShamsiCalendar.getDayNameByNumber(sch.dayOfWeek)} - ${sch.subjectName}", fontWeight = FontWeight.Bold, fontSize = 16.sp, color = Color(0xFF043927))
+                            Text("کلاس: ${if(sch.className.isBlank()) "ثبت نشده" else sch.className} | زمان: ${if(sch.timeSlot.isBlank()) "تعیین نشده" else sch.timeSlot}", fontSize = 12.sp, color = Color.Gray)
                         }
                         IconButton(onClick = {
                             dao.deleteSchedule(sch)
@@ -436,9 +442,9 @@ fun ScheduleSetupScreen(onBack: () -> Unit) {
         }
     }
 
-    (showAddDialog).let { if (it) {
-        var selectedDay by remember { mutableStateOf(1) }
-        var subjectName by remember { mutableStateOf("") }
+    if (showAddDialog) {
+        var selectedSubject by remember { mutableStateOf(predefinedSubjects.first()) }
+        val selectedDays = remember { mutableStateListOf<Int>() }
         var className by remember { mutableStateOf("") }
         var timeSlot by remember { mutableStateOf("") }
 
@@ -446,38 +452,77 @@ fun ScheduleSetupScreen(onBack: () -> Unit) {
             onDismissRequest = { showAddDialog = false },
             title = { Text("افزودن درس به برنامه") },
             text = {
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text("روز هفته:")
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Text("انتخاب درس:", fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                    
+                    // چیپ‌های دروس آماده
+                    Column {
+                        predefinedSubjects.chunked(3).forEach { rowSubjects ->
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(4.dp)
+                            ) {
+                                rowSubjects.forEach { sub ->
+                                    FilterChip(
+                                        selected = selectedSubject == sub,
+                                        onClick = { selectedSubject = sub },
+                                        label = { Text(sub, fontSize = 11.sp) }
+                                    )
+                                }
+                            }
+                        }
+                    }
+
+                    Divider(color = Color.LightGray)
+
+                    Text("روزهای برگزاری در هفته:", fontWeight = FontWeight.Bold, fontSize = 13.sp)
                     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                        (1..7).forEach { day ->
+                        (1..5).forEach { day -> // فقط شنبه تا چهارشنبه
                             FilterChip(
-                                selected = selectedDay == day,
-                                onClick = { selectedDay = day },
+                                selected = selectedDays.contains(day),
+                                onClick = {
+                                    if (selectedDays.contains(day)) selectedDays.remove(day)
+                                    else selectedDays.add(day)
+                                },
                                 label = { Text(ShamsiCalendar.getDayShortName(day), fontSize = 11.sp) }
                             )
                         }
                     }
-                    OutlinedTextField(value = subjectName, onValueChange = { subjectName = it }, label = { Text("نام درس / موضوع") })
-                    OutlinedTextField(value = className, onValueChange = { className = it }, label = { Text("نام کلاس") })
-                    OutlinedTextField(value = timeSlot, onValueChange = { timeSlot = it }, label = { Text("ساعت کلاس (مثلاً 08:00 - 09:30)") })
+
+                    OutlinedTextField(
+                        value = className,
+                        onValueChange = { className = it },
+                        label = { Text("نام کلاس (اختیاری)") },
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    OutlinedTextField(
+                        value = timeSlot,
+                        onValueChange = { timeSlot = it },
+                        label = { Text("ساعت کلاس (مثلاً 08:00 - 09:30)") },
+                        modifier = Modifier.fillMaxWidth()
+                    )
                 }
             },
             confirmButton = {
-                Button(onClick = {
-                    if (subjectName.isNotBlank()) {
-                        dao.insertSchedule(
-                            WeeklySchedule(
-                                dayOfWeek = selectedDay,
-                                subjectName = subjectName,
-                                className = className,
-                                timeSlot = timeSlot
-                            )
-                        )
-                        schedules = dao.getAllSchedules()
-                        showAddDialog = false
+                Button(
+                    onClick = {
+                        if (selectedDays.isNotEmpty()) {
+                            selectedDays.forEach { day ->
+                                dao.insertSchedule(
+                                    WeeklySchedule(
+                                        dayOfWeek = day,
+                                        subjectName = selectedSubject,
+                                        className = className,
+                                        timeSlot = timeSlot
+                                    )
+                                )
+                            }
+                            schedules = dao.getAllSchedules()
+                            showAddDialog = false
+                        }
                     }
-                }) { Text("ثبت") }
+                ) { Text("ثبت برنامه") }
             }
         )
-    }}
+    }
 }
