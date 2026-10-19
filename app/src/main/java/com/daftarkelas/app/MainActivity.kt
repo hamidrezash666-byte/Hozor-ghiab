@@ -94,13 +94,30 @@ fun CalendarScreen(
     // تشخیص روزهای تعطیل (پنج‌شنبه = 6 و جمعه = 7)
     val isHoliday = dayOfWeek == 6 || dayOfWeek == 7
 
+    // مدیریت منوی سه‌نقطه بالا
+    var menuExpanded by remember { mutableStateOf(false) }
+
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("طرح درس‌نویسی", fontWeight = FontWeight.Bold) },
+                title = { Text("تقویم طرح درس", fontWeight = FontWeight.Bold) },
                 actions = {
-                    TextButton(onClick = onOpenScheduleSetup) {
-                        Text("تنظیم برنامه هفتگی", color = Color(0xFF043927), fontWeight = FontWeight.Bold)
+                    Box {
+                        IconButton(onClick = { menuExpanded = true }) {
+                            Text("⋮", fontSize = 22.sp, fontWeight = FontWeight.Bold, color = Color(0xFF043927))
+                        }
+                        DropdownMenu(
+                            expanded = menuExpanded,
+                            onDismissRequest = { menuExpanded = false }
+                        ) {
+                            DropdownMenuItem(
+                                text = { Text("تنظیم برنامه هفتگی") },
+                                onClick = {
+                                    menuExpanded = false
+                                    onOpenScheduleSetup()
+                                }
+                            )
+                        }
                     }
                 }
             )
@@ -112,7 +129,7 @@ fun CalendarScreen(
                 .padding(padding)
                 .padding(16.dp)
         ) {
-            // نوار تقویم روزانه با متمایز کردن روزهای تعطیل
+            // نوار تقویم روزانه با قابلیت ورق زدن
             Card(
                 modifier = Modifier.fillMaxWidth(),
                 colors = CardDefaults.cardColors(
@@ -204,7 +221,7 @@ fun CalendarScreen(
 
                                 Divider(modifier = Modifier.padding(vertical = 8.dp), color = Color.LightGray)
 
-                                // نمایش مستقیم «فعالیت یاددهی-یادگیری» از بیرون
+                                // نمایش فعالیت یاددهی-یادگیری مستقیماً از بیرون روی کارت
                                 Text("فعالیت یاددهی-یادگیری:", fontSize = 12.sp, color = Color.Gray, fontWeight = FontWeight.Bold)
                                 Text(
                                     text = if (!plan?.learningActivity.isNull_or_blank()) plan!!.learningActivity else "هنوز فعالیتی ثبت نشده است (جهت ورود بزنید)",
@@ -419,7 +436,7 @@ fun ScheduleSetupScreen(onBack: () -> Unit) {
         }
     }
 
-    if (showAddDialog) {
+    (showAddDialog).let { if (it) {
         var selectedDay by remember { mutableStateOf(1) }
         var subjectName by remember { mutableStateOf("") }
         var className by remember { mutableStateOf("") }
@@ -462,5 +479,5 @@ fun ScheduleSetupScreen(onBack: () -> Unit) {
                 }) { Text("ثبت") }
             }
         )
-    }
+    }}
 }
