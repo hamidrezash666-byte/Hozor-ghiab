@@ -91,7 +91,6 @@ fun CalendarScreen(
     val dayName = remember(currentDate) { ShamsiCalendar.getDayOfWeekName(currentDate) }
     val daySchedules = remember(dayOfWeek) { dao.getSchedulesForDay(dayOfWeek) }
     
-    // پنج‌شنبه (6) و جمعه (7) تعطیل
     val isHoliday = dayOfWeek == 6 || dayOfWeek == 7
     var menuExpanded by remember { mutableStateOf(false) }
 
@@ -127,7 +126,7 @@ fun CalendarScreen(
                 .padding(padding)
                 .padding(16.dp)
         ) {
-            // نوار تقویم روزانه
+            // نوار انتخاب روز
             Card(
                 modifier = Modifier.fillMaxWidth(),
                 colors = CardDefaults.cardColors(
@@ -168,7 +167,7 @@ fun CalendarScreen(
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            // لیست درس‌های روز
+            // لیست کامل کارت درس‌ها همراه با نمایش مستقیم طرح درس
             LazyColumn(
                 modifier = Modifier.weight(1f),
                 verticalArrangement = Arrangement.spacedBy(12.dp)
@@ -192,7 +191,7 @@ fun CalendarScreen(
                                 .padding(32.dp),
                             contentAlignment = Alignment.Center
                         ) {
-                            Text("برای این روز برنامه‌ای ثبت نشده است.", color = Color.Gray)
+                            Text("برای این روز برنامه‌ای ثبت نشده است. از منوی بالا برنامه هفتگی را تنظیم کنید.", color = Color.Gray)
                         }
                     }
                 } else {
@@ -208,26 +207,54 @@ fun CalendarScreen(
                             elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
                         ) {
                             Column(modifier = Modifier.padding(16.dp)) {
+                                // هدر کارت (نام درس و زمان)
                                 Row(
                                     modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.SpaceBetween
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
                                 ) {
-                                    Text(schedule.subjectName, fontWeight = FontWeight.Bold, fontSize = 18.sp, color = Color(0xFF043927))
-                                    Text(schedule.timeSlot, fontSize = 13.sp, color = Color.Gray)
+                                    Text(
+                                        text = schedule.subjectName,
+                                        fontWeight = FontWeight.Bold,
+                                        fontSize = 19.sp,
+                                        color = Color(0xFF043927)
+                                    )
+                                    Text(
+                                        text = if (schedule.timeSlot.isNotBlank()) schedule.timeSlot else "زمان تعیین نشده",
+                                        fontSize = 12.sp,
+                                        color = Color.Gray
+                                    )
                                 }
+                                
                                 if (schedule.className.isNotBlank()) {
-                                    Text("کلاس: ${schedule.className}", fontSize = 13.sp, color = Color.DarkGray)
+                                    Text("کلاس: ${schedule.className}", fontSize = 12.sp, color = Color.DarkGray)
                                 }
 
-                                Divider(modifier = Modifier.padding(vertical = 8.dp), color = Color.LightGray)
+                                Divider(modifier = Modifier.padding(vertical = 10.dp), color = Color(0xFFE0E0E0))
 
-                                Text("فعالیت یاددهی-یادگیری:", fontSize = 12.sp, color = Color.Gray, fontWeight = FontWeight.Bold)
-                                Text(
-                                    text = if (!plan?.learningActivity.isNull_or_blank()) plan!!.learningActivity else "هنوز فعالیتی ثبت نشده است (جهت ورود بزنید)",
-                                    fontSize = 14.sp,
-                                    fontWeight = FontWeight.Medium,
-                                    color = if (!plan?.learningActivity.isNull_or_blank()) Color.Black else Color.LightGray
-                                )
+                                // نمایش کامل محتوای طرح درس مستقیماً در همین کارت
+                                if (plan != null && (plan.topic.isNotBlank() || plan.objective.isNotBlank() || plan.learningActivity.isNotBlank())) {
+                                    if (plan.topic.isNotBlank()) {
+                                        PlanDetailRow(title = "موضوع:", value = plan.topic)
+                                    }
+                                    if (plan.objective.isNotBlank()) {
+                                        PlanDetailRow(title = "هدف آموزشی:", value = plan.objective)
+                                    }
+                                    if (plan.teachingMethod.isNotBlank()) {
+                                        PlanDetailRow(title = "روش تدریس:", value = plan.teachingMethod)
+                                    }
+                                    if (plan.learningActivity.isNotBlank()) {
+                                        PlanDetailRow(title = "فعالیت یاددهی-یادگیری:", value = plan.learningActivity)
+                                    }
+                                } else {
+                                    Text(
+                                        text = "✏️ هنوز طرح درسی ثبت نشده است. (جهت ثبت/ویرایش کلیک کنید)",
+                                        fontSize = 13.sp,
+                                        color = Color.Gray,
+                                        fontWeight = FontWeight.Normal,
+                                        modifier = Modifier.padding(vertical = 4.dp)
+                                    )
+                                }
                             }
                         }
                     }
@@ -253,6 +280,14 @@ fun CalendarScreen(
     }
 }
 
+@Composable
+fun PlanDetailRow(title: String, value: String) {
+    Column(modifier = Modifier.padding(bottom = 6.dp)) {
+        Text(text = title, fontSize = 12.sp, color = Color(0xFF2E7D32), fontWeight = FontWeight.Bold)
+        Text(text = value, fontSize = 14.sp, color = Color.Black, fontWeight = FontWeight.Medium)
+    }
+}
+
 private fun String?.isNull_or_blank(): Boolean = this == null || this.isBlank()
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -266,7 +301,6 @@ fun LessonEditScreen(
     val dao = remember { AppDatabase.getDatabase(context).lessonPlanDao() }
 
     val existingPlan = remember { dao.getPlanForDate(schedule.id, dateStr) }
-    // فراخوانی یادداشت منتقل شده از جلسه قبل برای همین درس
     val previousNote = remember { dao.getPreviousNote(schedule.id, dateStr) }
 
     var topic by remember { mutableStateOf(existingPlan?.topic ?: "") }
@@ -278,7 +312,7 @@ fun LessonEditScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("طرح درس: ${schedule.subjectName}") },
+                title = { Text("ویرایش طرح درس: ${schedule.subjectName}") },
                 navigationIcon = { TextButton(onClick = onBack) { Text("بازگشت") } }
             )
         }
@@ -289,7 +323,6 @@ fun LessonEditScreen(
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            // یادآور هوشمند: نمایش یادداشت ثبت شده در جلسه قبلیِ همین درس در بالای فرم
             if (!previousNote.isNullOrBlank()) {
                 item {
                     Card(
@@ -390,7 +423,6 @@ fun ScheduleSetupScreen(onBack: () -> Unit) {
     var schedules by remember { mutableStateOf(dao.getAllSchedules()) }
     var showAddDialog by remember { mutableStateOf(false) }
 
-    // لیست دروس آماده
     val predefinedSubjects = listOf(
         "قرآن", "ورزش", "هنر", "تفکر و پژوهش", "کاروفناوری",
         "هدیه‌ها", "علوم", "مطالعات اجتماعی", "فارسی", "ریاضی"
@@ -455,7 +487,6 @@ fun ScheduleSetupScreen(onBack: () -> Unit) {
                 Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                     Text("انتخاب درس:", fontWeight = FontWeight.Bold, fontSize = 13.sp)
                     
-                    // چیپ‌های دروس آماده
                     Column {
                         predefinedSubjects.chunked(3).forEach { rowSubjects ->
                             Row(
@@ -477,7 +508,7 @@ fun ScheduleSetupScreen(onBack: () -> Unit) {
 
                     Text("روزهای برگزاری در هفته:", fontWeight = FontWeight.Bold, fontSize = 13.sp)
                     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                        (1..5).forEach { day -> // فقط شنبه تا چهارشنبه
+                        (1..5).forEach { day ->
                             FilterChip(
                                 selected = selectedDays.contains(day),
                                 onClick = {
