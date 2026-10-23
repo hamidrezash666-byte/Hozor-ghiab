@@ -7,10 +7,10 @@ import androidx.room.*
 @Entity(tableName = "weekly_schedule")
 data class WeeklySchedule(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
-    val dayOfWeek: Int, // 1: شنبه, 2: یکشنبه, ..., 7: جمعه
     val subjectName: String,
-    val className: String,
-    val timeSlot: String
+    val selectedDays: String, // مثلاً "1,3,5" برای شنبه، دوشنبه، چهارشنبه
+    val className: String = "",
+    val timeSlot: String = ""
 )
 
 // جدول طرح درس‌های ثبت‌شده برای هر جلسه
@@ -28,31 +28,29 @@ data class LessonPlan(
 
 @Dao
 interface LessonPlanDao {
-    // برنامه هفتگی
-    @Insert fun insertSchedule(schedule: WeeklySchedule): Long
-    @Query("SELECT * FROM weekly_schedule ORDER BY dayOfWeek ASC, timeSlot ASC") fun getAllSchedules(): List<WeeklySchedule>
-    @Query("SELECT * FROM weekly_schedule WHERE dayOfWeek = :dayOfWeek") fun getSchedulesForDay(dayOfWeek: Int): List<WeeklySchedule>
+    @Insert(onConflict = OnConflictStrategy.REPLACE) fun insertSchedule(schedule: WeeklySchedule): Long
+    @Query("SELECT * FROM weekly_schedule ORDER BY id DESC") fun getAllSchedules(): List<WeeklySchedule>
     @Delete fun deleteSchedule(schedule: WeeklySchedule)
 
-    // طرح درس
+    // پیدا کردن درس‌هایی که در روز مورد نظر برگزار می‌شوند
+    @Query("SELECT * FROM weekly_schedule WHERE selectedDays LIKE '%' || :dayOfWeek || '%'")
+    fun getSchedulesForDay(dayOfWeek: Int): List<WeeklySchedule>
+
     @Insert(onConflict = OnConflictStrategy.REPLACE) fun insertOrUpdatePlan(plan: LessonPlan): Long
+    
     @Query("SELECT * FROM lesson_plans WHERE scheduleId = :scheduleId AND dateStr = :dateStr LIMIT 1")
     fun getPlanForDate(scheduleId: Long, dateStr: String): LessonPlan?
 
-    // دریافت آخرین یادداشت ثبت‌شده برای این درس بر اساس نام درس در تمام روزهای هفته
+    // دریافت آخرین یادداشت ثبت‌شده برای این درس در تمام جلسات قبلی
     @Query("""
-        SELECT lp.noteForNextSession FROM lesson_plans lp
-        JOIN weekly_schedule ws ON lp.scheduleId = ws.id
-        JOIN weekly_schedule current_ws ON current_ws.id = :scheduleId
-        WHERE ws.subjectName = current_ws.subjectName 
-          AND lp.dateStr != :currentDate 
-          AND lp.noteForNextSession != '' 
-        ORDER BY lp.id DESC LIMIT 1
+        SELECT noteForNextSession FROM lesson_plans 
+        WHERE scheduleId = :scheduleId AND dateStr != :currentDate AND noteForNextSession != '' 
+        ORDER BY id DESC LIMIT 1
     """)
     fun getPreviousNote(scheduleId: Long, currentDate: String): String?
 }
 
-@Database(entities = [WeeklySchedule::class, LessonPlan::class], version = 2, exportSchema = false)
+@Database(entities = [WeeklySchedule::class, LessonPlan::class], version = 4, exportSchema = false)
 abstract class AppDatabase : RoomDatabase() {
     abstract fun lessonPlanDao(): LessonPlanDao
 
