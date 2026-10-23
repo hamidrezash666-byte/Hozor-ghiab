@@ -39,11 +39,15 @@ interface LessonPlanDao {
     @Query("SELECT * FROM lesson_plans WHERE scheduleId = :scheduleId AND dateStr = :dateStr LIMIT 1")
     fun getPlanForDate(scheduleId: Long, dateStr: String): LessonPlan?
 
-    // دریافت آخرین یادداشت ثبت‌شده برای این درس بر اساس آخرین رکورد قبلی (بدون مقایسه رشته‌ای تاریخ)
+    // دریافت آخرین یادداشت ثبت‌شده برای این درس بر اساس نام درس در تمام روزهای هفته
     @Query("""
-        SELECT noteForNextSession FROM lesson_plans 
-        WHERE scheduleId = :scheduleId AND dateStr != :currentDate AND noteForNextSession != '' 
-        ORDER BY id DESC LIMIT 1
+        SELECT lp.noteForNextSession FROM lesson_plans lp
+        JOIN weekly_schedule ws ON lp.scheduleId = ws.id
+        JOIN weekly_schedule current_ws ON current_ws.id = :scheduleId
+        WHERE ws.subjectName = current_ws.subjectName 
+          AND lp.dateStr != :currentDate 
+          AND lp.noteForNextSession != '' 
+        ORDER BY lp.id DESC LIMIT 1
     """)
     fun getPreviousNote(scheduleId: Long, currentDate: String): String?
 }
