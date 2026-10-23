@@ -126,7 +126,6 @@ fun CalendarScreen(
                 .padding(padding)
                 .padding(16.dp)
         ) {
-            // نوار انتخاب روز
             Card(
                 modifier = Modifier.fillMaxWidth(),
                 colors = CardDefaults.cardColors(
@@ -167,7 +166,6 @@ fun CalendarScreen(
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            // لیست کامل کارت درس‌ها همراه با نمایش مستقیم طرح درس
             LazyColumn(
                 modifier = Modifier.weight(1f),
                 verticalArrangement = Arrangement.spacedBy(12.dp)
@@ -207,7 +205,6 @@ fun CalendarScreen(
                             elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
                         ) {
                             Column(modifier = Modifier.padding(16.dp)) {
-                                // هدر کارت (نام درس و زمان)
                                 Row(
                                     modifier = Modifier.fillMaxWidth(),
                                     horizontalArrangement = Arrangement.SpaceBetween,
@@ -232,26 +229,16 @@ fun CalendarScreen(
 
                                 Divider(modifier = Modifier.padding(vertical = 10.dp), color = Color(0xFFE0E0E0))
 
-                                // نمایش کامل محتوای طرح درس مستقیماً در همین کارت
-                                if (plan != null && (plan.topic.isNotBlank() || plan.objective.isNotBlank() || plan.learningActivity.isNotBlank())) {
-                                    if (plan.topic.isNotBlank()) {
-                                        PlanDetailRow(title = "موضوع:", value = plan.topic)
-                                    }
-                                    if (plan.objective.isNotBlank()) {
-                                        PlanDetailRow(title = "هدف آموزشی:", value = plan.objective)
-                                    }
-                                    if (plan.teachingMethod.isNotBlank()) {
-                                        PlanDetailRow(title = "روش تدریس:", value = plan.teachingMethod)
-                                    }
-                                    if (plan.learningActivity.isNotBlank()) {
-                                        PlanDetailRow(title = "فعالیت یاددهی-یادگیری:", value = plan.learningActivity)
-                                    }
+                                if (plan != null && (plan.topic.isNotBlank() || plan.objective.isNotBlank() || plan.learningActivity.isNotBlank() || plan.teachingMethod.isNotBlank())) {
+                                    if (plan.topic.isNotBlank()) PlanDetailRow(title = "موضوع:", value = plan.topic)
+                                    if (plan.objective.isNotBlank()) PlanDetailRow(title = "هدف آموزشی:", value = plan.objective)
+                                    if (plan.teachingMethod.isNotBlank()) PlanDetailRow(title = "روش تدریس:", value = plan.teachingMethod)
+                                    if (plan.learningActivity.isNotBlank()) PlanDetailRow(title = "فعالیت یاددهی-یادگیری:", value = plan.learningActivity)
                                 } else {
                                     Text(
                                         text = "✏️ هنوز طرح درسی ثبت نشده است. (جهت ثبت/ویرایش کلیک کنید)",
                                         fontSize = 13.sp,
                                         color = Color.Gray,
-                                        fontWeight = FontWeight.Normal,
                                         modifier = Modifier.padding(vertical = 4.dp)
                                     )
                                 }
@@ -261,7 +248,6 @@ fun CalendarScreen(
                 }
             }
 
-            // نام طراح
             CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr) {
                 Box(
                     modifier = Modifier
@@ -288,8 +274,6 @@ fun PlanDetailRow(title: String, value: String) {
     }
 }
 
-private fun String?.isNull_or_blank(): Boolean = this == null || this.isBlank()
-
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun LessonEditScreen(
@@ -308,6 +292,19 @@ fun LessonEditScreen(
     var teachingMethod by remember { mutableStateOf(existingPlan?.teachingMethod ?: "") }
     var learningActivity by remember { mutableStateOf(existingPlan?.learningActivity ?: "") }
     var noteForNextSession by remember { mutableStateOf(existingPlan?.noteForNextSession ?: "") }
+
+    var showMethodDialog by remember { mutableStateOf(false) }
+
+    val teachingMethodsList = listOf(
+        "روش توضیحی", "روش پرسش و پاسخ", "روش حل مسئله", "روش حل تمرین",
+        "روش اکتشافی", "روش کاوشگری", "روش نمایشی", "روش آزمایشی",
+        "روش بحث گروهی", "روش یادگیری مشارکتی", "روش فعالیت گروهی", "روش بارش فکری",
+        "روش ایفای نقش", "روش قصه‌گویی", "روش بازی آموزشی", "روش پروژه‌محور",
+        "روش تمرین و تکرار", "روش الگوسازی", "روش یادگیری معکوس", "روش مشاهده و تجربه",
+        "روش سخنرانی", "روش اکتشاف هدایت‌شده", "روش یادگیری فعال", "روش آموزش مستقیم",
+        "روش یادگیری همیارانه", "روش نمایش فیلم و محتوای چندرسانه‌ای", "روش آموزش عملی",
+        "روش کارگاهی", "روش شبیه‌سازی", "روش مطالعه موردی"
+    )
 
     Scaffold(
         topBar = {
@@ -358,12 +355,21 @@ fun LessonEditScreen(
                 )
             }
 
+            // فیلد روش تدریس با قابلیت کلیک و باز کردن منوی انتخاب چندگانه
             item {
                 OutlinedTextField(
                     value = teachingMethod,
                     onValueChange = { teachingMethod = it },
-                    label = { Text("روش تدریس") },
-                    modifier = Modifier.fillMaxWidth()
+                    label = { Text("روش تدریس (انتخاب از لیست)") },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable { showMethodDialog = true },
+                    enabled = false, // غیرقابل تایپ مستقیم برای حفظ ساختار، با کلیک دیالوگ باز می‌شود
+                    colors = OutlinedTextFieldDefaults.colors(
+                        disabledTextColor = Color.Black,
+                        disabledBorderColor = Color.Gray,
+                        disabledLabelColor = Color.DarkGray
+                    )
                 )
             }
 
@@ -413,6 +419,99 @@ fun LessonEditScreen(
             }
         }
     }
+
+    // دیالوگ جستجو و انتخاب چندگانه روش‌های تدریس
+    if (showMethodDialog) {
+        var searchQuery by remember { mutableStateOf("") }
+        // تجزیه روش‌های از قبل انتخاب شده به یک لیست
+        val selectedMethods = remember {
+            mutableStateListOf<String>().apply {
+                if (teachingMethod.isNotBlank()) {
+                    addAll(teachingMethod.split("، ").map { it.trim() })
+                }
+            }
+        }
+
+        val filteredMethods = remember(searchQuery) {
+            if (searchQuery.isBlank()) teachingMethodsList
+            else teachingMethodsList.filter { it.contains(searchQuery) }
+        }
+
+        AlertDialog(
+            onDismissRequest = { showMethodDialog = false },
+            title = { Text("انتخاب روش‌های تدریس", fontWeight = FontWeight.Bold, fontSize = 16.sp) },
+            text = {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(400.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    OutlinedTextField(
+                        value = searchQuery,
+                        onValueChange = { searchQuery = it },
+                        label = { Text("جستجوی روش تدریس...") },
+                        modifier = Modifier.fillMaxWidth(),
+                        singleLine = true
+                    )
+
+                    LazyColumn(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .weight(1f),
+                        verticalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        items(filteredMethods) { method ->
+                            val isSelected = selectedMethods.contains(method)
+                            Surface(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clickable {
+                                        if (isSelected) selectedMethods.remove(method)
+                                        else selectedMethods.add(method)
+                                    },
+                                color = if (isSelected) Color(0xFFE8F5E9) else Color.Transparent,
+                                shape = RoundedCornerShape(6.dp)
+                            ) {
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(8.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.SpaceBetween
+                                ) {
+                                    Text(method, fontSize = 14.sp, color = if (isSelected) Color(0xFF043927) else Color.Black, fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal)
+                                    Checkbox(
+                                        checked = isSelected,
+                                        onCheckedChange = { checked ->
+                                            if (checked) selectedMethods.add(method)
+                                            else selectedMethods.remove(method)
+                                        }
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        teachingMethod = selectedMethods.joinToString("، ")
+                        showMethodDialog = false
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF043927))
+                ) {
+                    Text("تایید انتخاب")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showMethodDialog = false }) {
+                    Text("انصراف", color = Color.Gray)
+                }
+            }
+        )
+    }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -450,6 +549,10 @@ fun ScheduleSetupScreen(onBack: () -> Unit) {
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             items(schedules) { sch ->
+                val daysReadable = sch.selectedDays.split(",")
+                    .mapNotNull { it.toIntOrNull() }
+                    .joinToString("، ") { ShamsiCalendar.getDayShortName(it) }
+
                 Card(modifier = Modifier.fillMaxWidth()) {
                     Row(
                         modifier = Modifier
@@ -459,7 +562,9 @@ fun ScheduleSetupScreen(onBack: () -> Unit) {
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Column {
-                            Text("${ShamsiCalendar.getDayNameByNumber(sch.dayOfWeek)} - ${sch.subjectName}", fontWeight = FontWeight.Bold, fontSize = 16.sp, color = Color(0xFF043927))
+                            Text(sch.subjectName, fontWeight = FontWeight.Bold, fontSize = 17.sp, color = Color(0xFF043927))
+                            Spacer(modifier = Modifier.height(2.dp))
+                            Text("روزها: $daysReadable", fontSize = 13.sp, color = Color.DarkGray)
                             Text("کلاس: ${if(sch.className.isBlank()) "ثبت نشده" else sch.className} | زمان: ${if(sch.timeSlot.isBlank()) "تعیین نشده" else sch.timeSlot}", fontSize = 12.sp, color = Color.Gray)
                         }
                         IconButton(onClick = {
@@ -538,16 +643,15 @@ fun ScheduleSetupScreen(onBack: () -> Unit) {
                 Button(
                     onClick = {
                         if (selectedDays.isNotEmpty()) {
-                            selectedDays.forEach { day ->
-                                dao.insertSchedule(
-                                    WeeklySchedule(
-                                        dayOfWeek = day,
-                                        subjectName = selectedSubject,
-                                        className = className,
-                                        timeSlot = timeSlot
-                                    )
+                            val daysString = selectedDays.sorted().joinToString(",")
+                            dao.insertSchedule(
+                                WeeklySchedule(
+                                    subjectName = selectedSubject,
+                                    selectedDays = daysString,
+                                    className = className,
+                                    timeSlot = timeSlot
                                 )
-                            }
+                            )
                             schedules = dao.getAllSchedules()
                             showAddDialog = false
                         }
