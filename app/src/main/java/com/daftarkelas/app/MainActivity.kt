@@ -355,7 +355,6 @@ fun LessonEditScreen(
                 )
             }
 
-            // فیلد روش تدریس با قابلیت کلیک و باز کردن منوی انتخاب چندگانه
             item {
                 OutlinedTextField(
                     value = teachingMethod,
@@ -364,7 +363,7 @@ fun LessonEditScreen(
                     modifier = Modifier
                         .fillMaxWidth()
                         .clickable { showMethodDialog = true },
-                    enabled = false, // غیرقابل تایپ مستقیم برای حفظ ساختار، با کلیک دیالوگ باز می‌شود
+                    enabled = false,
                     colors = OutlinedTextFieldDefaults.colors(
                         disabledTextColor = Color.Black,
                         disabledBorderColor = Color.Gray,
@@ -420,10 +419,8 @@ fun LessonEditScreen(
         }
     }
 
-    // دیالوگ جستجو و انتخاب چندگانه روش‌های تدریس
     if (showMethodDialog) {
         var searchQuery by remember { mutableStateOf("") }
-        // تجزیه روش‌های از قبل انتخاب شده به یک لیست
         val selectedMethods = remember {
             mutableStateListOf<String>().apply {
                 if (teachingMethod.isNotBlank()) {
